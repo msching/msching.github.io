@@ -7,7 +7,7 @@ title: 码农人生
 subtitle: ChengYin's coding life
 author: ChengYinZju
 simple_search: https://www.google.com/search
-description: ChengYin's coding life
+description:
 
 # Default date format is "ordinal" (resulting in "July 22nd 2007")
 # You can customize the format as defined in
@@ -19,7 +19,7 @@ date_format: "ordinal"
 subscribe_rss: /atom.xml
 subscribe_email:
 # RSS feeds can list your email address if you like
-email: msching@163.com
+email:
 
 # ----------------------- #
 #    Jekyll & Plugins     #
@@ -61,6 +61,10 @@ default_asides: [asides/recent_posts.html, asides/github.html, asides/delicious.
 # ----------------------- #
 #   3rd Party Settings    #
 # ----------------------- #
+
+#weibo
+weibo_user: msching
+weibo_share: true
 
 # Github repositories
 github_user: msching

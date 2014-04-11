@@ -313,18 +313,26 @@ $header-height: 30px;
 			@include border-radius(50%);
 			@include inline-block;
 			text-indent: -9999px;
-			margin: 0 15px 15px 0;
+			margin-right: 5px;
+			margin-bottom: 15px;
 			opacity: 0.5;
 			@include square(28px);
 			@include transition(0.3s);
 			&:hover{
 				opacity: 1;
 			}
-			&.email{
-				background: image-url('social/email.png') center no-repeat #050505;
-				border: 1px solid #050505;
+			&.weibo{
+				background: image-url('social/weibo.png') center no-repeat #e32529;
+				border: 1px solid #e32529;
 				&:hover{
-					border: 1px solid darken(#050505, 10%);
+					border: 1px solid darken(#e32529, 10%);
+				}
+			}
+			&.dribbble{
+				background: image-url('social/dribbble.png') center no-repeat #c5376d;
+				border: 1px solid #c5376d;
+				&:hover{
+					border: 1px solid darken(#c5376d, 10%);
 				}
 			}
 			&.facebook{
@@ -355,23 +363,12 @@ $header-height: 30px;
 					border: 1px solid darken(rgb(175,182,202), 10%);
 				}
 			}
-			&.coderwall{
-				background: image-url('social/coderwall.png') center no-repeat #3E8DCC;
-				border: 1px solid #3E8DCC;
-				&:hover{
-					border: 1px solid darken(#3E8DCC, 10%);
-				}
-			}
-			&.stackoverflow{
-				background: image-url('social/stackoverflow.png') center no-repeat #EF7522;
-				border:1px solid #EF7522;
-				&:hover{
-					border:1px solid #CC7A00;
-				}
-			}
 			&.linkedin{
 				background: image-url('social/linkedin.png') center no-repeat #005A87;
 				border: 1px solid #005A87;
+				&:hover{
+					border: 1px solid darken(#005A87, 10%);
+				}
 			}
 			&.pinterest{
 				background: image-url('social/pinterest.png') center no-repeat rgb(190,64,55);
@@ -388,39 +385,11 @@ $header-height: 30px;
 				}
 			}
 			&.pinboard{
-			  	background: image-url('social/pinboard.png') center no-repeat rgb(0,102,200);
-			  	border: 1px solid rgb(58,114,159);
-			  	&:hover{
-			    	border: 1px solid darken(rgb(0,102,255), 10%);
-			  	}
-			}
-			&.douban{
-			  	background: image-url('social/douban.png') center no-repeat rgb(0,128,36);
-			  	border: 1px solid rgb(0,128,36);
-			  	&:hover{
-			    	border: 1px solid darken(rgb(0,128,36), 10%);
-			  	}
-			}
-			&.quora{
-				background: image-url('social/quora.png') center no-repeat #a82400;
-				border: 1px solid #a82400;
-				&:hover{
-					border: 1px solid darken(#a82400, 10%);
-			 	}
-			}
-      		&.instagram{
-				background: image-url('social/instagram.png') center no-repeat #517fa4;
-				border: 1px solid #517fa4;
-				&:hover{
-					border: 1px solid darken(#517fa4, 10%);
-			 	}
-			}
-      		&.behance{
-				background: image-url('social/behance.png') center no-repeat #1769ff;
-				border: 1px solid #1769ff;
-				&:hover{
-					border: 1px solid darken(#1769ff, 10%);
-			  	}
+			  background: image-url('social/pinboard.png') center no-repeat rgb(0,102,200);
+			  border: 1px solid rgb(58,114,159);
+			  &:hover{
+			    border: 1px solid darken(rgb(0,102,255), 10%);
+			  }
 			}
 			&.rss{
 				background: image-url('social/rss.png') center no-repeat #EF7522;
