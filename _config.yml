@@ -19,7 +19,7 @@ date_format: "ordinal"
 subscribe_rss: /atom.xml
 subscribe_email:
 # RSS feeds can list your email address if you like
-email:
+email: msching@163.com
 
 # ----------------------- #
 #    Jekyll & Plugins     #
@@ -63,14 +63,14 @@ default_asides: [asides/recent_posts.html, asides/github.html, asides/delicious.
 # ----------------------- #
 
 # Github repositories
-github_user:
+github_user: msching
 github_repo_count: 0
 github_show_profile_link: true
 github_skip_forks: true
 
 # Twitter
-#twitter_user:
-#twitter_tweet_button: true
+twitter_user:
+twitter_tweet_button: false
 
 # Google +1
 google_plus_one: false
