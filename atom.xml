@@ -4,7 +4,7 @@
   <title><![CDATA[My Octopress Blog]]></title>
   <link href="http://msching.github.io/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-04-11T14:03:26+08:00</updated>
+  <updated>2014-04-11T14:10:34+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[Your Name]]></name>
@@ -12,5 +12,14 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA['Starting']]></title>
+    <link href="http://msching.github.io/blog/2014/04/11/starting/"/>
+    <updated>2014-04-11T14:10:07+08:00</updated>
+    <id>http://msching.github.io/blog/2014/04/11/starting</id>
+    <content type="html"><![CDATA[
+]]></content>
+  </entry>
   
 </feed>
