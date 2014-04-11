@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "'Starting'"
+title: "Starting"
 date: 2014-04-11 14:10:07 +0800
 comments: true
 categories: 
