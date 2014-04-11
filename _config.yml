@@ -62,7 +62,7 @@ default_asides: [asides/recent_posts.html, asides/github.html, asides/delicious.
 #   3rd Party Settings    #
 # ----------------------- #
 
-#weibo
+# Weibo
 weibo_user: msching
 weibo_share: true
 
