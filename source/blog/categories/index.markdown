@@ -2,7 +2,7 @@
 layout: page
 title: "分类 Categories"
 date: 2013-07-28 23:11
-comments: true
+comments: false
 sharing: false
 footer: true
 ---
