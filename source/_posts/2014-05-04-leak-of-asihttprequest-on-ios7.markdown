@@ -3,6 +3,7 @@ layout: post
 title: ASIHTTPRequest iOS7下内存泄漏问题解决记录- leak of ASIHTTPRequest on iOS7
 date: 2014-05-04 19:46:53 +0800
 comments: true
+statement: true
 categories: [iOS,ASIHTTPRequest]
 ---
 

@@ -3,6 +3,7 @@ layout: post
 title: "AVAudioPlayer的小秘密 - Secret of AVAudioPlayer"
 date: 2014-05-04 14:43:40 +0800
 comments: true
+statement: true
 categories: [iOS,Audio]
 ---
 
