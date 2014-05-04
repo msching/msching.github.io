@@ -1,7 +1,8 @@
 ---
 layout: post
-title: ASIHTTPRequest iOS7下内存泄漏问题解决记录- leak of ASIHTTPRequest on iOS7
-date: 2014-05-04 19:46:53 +0800
+title: "ASIHTTPRequest iOS7下内存泄漏问题解决记录"
+subtitle: "leak of ASIHTTPRequest on iOS7"
+date: 2014-05-04 14:43:40 +0800
 comments: true
 statement: true
 categories: [iOS,ASIHTTPRequest]
@@ -9,9 +10,9 @@ categories: [iOS,ASIHTTPRequest]
 
 ----------
 
-这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。
+###这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。
 
-现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。
+###现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。
 
 ----------
 
@@ -120,11 +121,11 @@ iOS7发布后，我们对产品进行了iOS7的适配。适配完成之后的某
 
 这些方法的作用大家可以参考链接：<http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/>。
 
-简单的说就是NSInputStream需要同时支持 **NSRunLoop** 和 **CFRunLoopRef** 的schedule和unschedule方法，那几个私有方法就是负责CFRunLoopRef的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的release方法，iOS6下它的堆栈中正好有CFRunLoop的一些方法。莫非这就是ASIInputStream内存泄漏的原因所在？
+简单的说就是`NSInputStream`需要同时支持`NSRunLoop`和`CFRunLoopRef`的schedule和unschedule方法，那几个私有方法就是负责`CFRunLoopRef`的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的`release`方法，iOS6下它的堆栈中正好有`CFRunLoopRef`的一些方法。莫非这就是`ASIInputStream`内存泄漏的原因所在？
 
-我当时的猜测是，iOS7下的内存泄漏是ASIInputStream伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但ASIInputStream的功能依然存在，HTTP请求并未因此失效，这说明ASIInputStream还是被bridge成了CFReadStream，但只是因为少了和NSInputStream一样的unschedule方法导致其没有被正常unschedule。如果我把ASIInputStream的unschedule方法补上是否就可以解决问题？
+我当时的猜测是，iOS7下的内存泄漏是`ASIInputStream`伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但`ASIInputStream`的功能依然存在，HTTP请求并未因此失效，这说明`ASIInputStream`还是被bridge成了`CFReadStream`，但只是因为少了和`NSInputStream`一样的unschedule方法导致其没有被正常unschedule。如果我把`ASIInputStream`的unschedule方法补上是否就可以解决问题？
 
-我把上述的几个方法在ASIInputStream中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在ASIInputStream的release方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把"_"去掉了）。
+我把上述的几个方法在`ASIInputStream`中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在`ASIInputStream`的`release`方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把"_"去掉了）。
 
 ```objective-c
 + (BOOL) resolveInstanceMethod:(SEL) selector
@@ -150,9 +151,10 @@ iOS7发布后，我们对产品进行了iOS7的适配。适配完成之后的某
 }
 ```
 
-至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请通过微博[@程寅zju](http://www.weibo.com/msching/)告知。。感激不尽 ~_~
+至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请告知。。感激不尽 ~_~。
 
-附上修改过后的ASIInputStream代码<https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330>
+
+附上修改过后的`ASIInputStream`[代码](https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330)
 
 ----------
 #后记

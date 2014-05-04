@@ -1,6 +1,7 @@
 ---
 layout: post
-title: "基于Github和Octopress搭建属于自己的博客 - Blog based on Github & Octopress"
+title: "基于Github和Octopress搭建属于自己的博客"
+subtitle : "Blog based on Github & Octopress"
 date: 2014-04-11 14:10:07 +0800
 comments: true
 sharing: true

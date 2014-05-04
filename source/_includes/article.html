@@ -12,10 +12,10 @@
 		{% capture excerpted %}{{ content | has_excerpt }}{% endcapture %}
 		{% if excerpted == 'true' %}<a href="{{ root_url }}{{ post.url }}" class="more-link">{{ site.excerpt_link }}</a>{% endif %}
 	</div>
-	{% if post.statement == true %}
-		{% include post/statement.html %}
-	{% endif %}
 {% else %}
 	<h1 class="title" itemprop="name">{% if site.titlecase %}{{ page.title | titlecase }}{% else %}{{ page.title }}{% endif %}</h1>
 	<div class="entry-content" itemprop="articleBody">{{ content }}</div>
+	{% if page.statement == true %}
+		{% include post/statement.html %}
+	{% endif %}
 {% endif %}
