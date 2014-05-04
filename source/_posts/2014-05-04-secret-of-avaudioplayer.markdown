@@ -12,7 +12,7 @@ categories: [iOS,Audio]
 
 他需要播放一段网络上的音频，实现策略是把音频下载到本地，然后使用AVAudioPlayer进行播放。代码大致是这样的：
 
-```
+```objective-c
 NSString *path = .../xxx.mp3; //mp3 file path
 NSData *data = [NSData dataWithContentsOfURL:[NSURL fileURLWithPath:path]];
 NSError *error = nil;
@@ -21,7 +21,7 @@ AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithData:data error:&error];
 
 但他在init AVAudioPlayer时遇到了下面的错误。
 
-```
+```objective-c
 Error Domain=NSOSStatusErrorDomain Code=1937337955 "The operation couldn’t be completed. (OSStatus error 1937337955.)"
 ```
 
@@ -33,12 +33,12 @@ Error Domain=NSOSStatusErrorDomain Code=1937337955 "The operation couldn’t be 
 
 其中提到的解决方法都一样，就是使用AVAudioPlayer的另一个init方法：
 
-```
+```objective-c
 - (id)initWithContentsOfURL:(NSURL *)url error:(NSError **)outError;
 ```
 于是尝试修改了代码：
 
-```
+```objective-c
 NSString *path = .../xxx.mp3; //mp3 file path
 NSError *error = nil;
 AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL fileURLWithPath:path] error:&error];
@@ -51,17 +51,17 @@ AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL file
 
 不能播放的问题到这里已经fix了，但这个问题本身还没有完结，为什么使用`-initWithContentsOfURL:error:`方法就可以播呢？这个时候也许有的人会认为这是一个apple的bug，认为`-initWithContentsOfURL:error:`方法比`-initWithData::error:`具有更好的适应性。
 
-```
-Oh that's very interesting. Perhaps that should be submitted to Apple as a bug? 
-In the end I opted for the saved file anyways because it fit better with what we were trying to do. 
-Thanks for the Tip! –  mtmurdock Mar 19 '11 at 0:26
-```
+
+	Oh that's very interesting. Perhaps that should be submitted to Apple as a bug? 
+	In the end I opted for the saved file anyways because it fit better with what we were trying to do. 
+	Thanks for the Tip! –  mtmurdock Mar 19 '11 at 0:26
+
 
 但凡事遇到错误，都应该先从自身开始找原因。经过搜索发现，1937337955这个Errorcode其实就是`kAudioFileUnsupportedFileTypeError`，一般出现在文件格式不符合规范的情况下。假设apple并没有写出bug的话，那么上述问题中的这个mp3一定在文件格式上有缺陷，最终导致了`-initWithData::error:`方法返回错误，而`-initWithContentsOfURL:error:`采用某种方式规避了这个格式缺陷。
 
 回过头去查看`AVAudioPlayer.h`头文件可以看到SDK7中多了两个init方法：
 
-```
+```objective-c
 /* The file type hint is a constant defined in AVMediaFormat.h whose value is a UTI for a file format. e.g. AVFileTypeAIFF. */
 /* Sometimes the type of a file cannot be determined from the data, or it is actually corrupt.
 The file type hint tells the parser what kind of data to look for so that files which are not self identifying or possibly even corrupt can be successfully parsed. */
@@ -73,7 +73,7 @@ The file type hint tells the parser what kind of data to look for so that files 
 
 接下来尝试在iOS7系统下使用新的init方法生成AVAudioPlayer：
 
-```
+```objective-c
 NSString *path = .../xxx.mp3; //mp3 file path
 NSData *data = [NSData dataWithContentsOfURL:[NSURL fileURLWithPath:path]];
 NSError *error = nil;
