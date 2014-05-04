@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Audio | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/audio/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-05-04T21:15:47+08:00</updated>
+  <updated>2014-05-05T01:13:25+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -14,9 +14,9 @@
 
   
   <entry>
-    <title type="html"><![CDATA[AVAudioPlayer的小秘密 - Secret of AVAudioPlayer]]></title>
+    <title type="html"><![CDATA[AVAudioPlayer的小秘密]]></title>
     <link href="http://msching.github.io/blog/2014/05/04/secret-of-avaudioplayer/"/>
-    <updated>2014-05-04T14:43:40+08:00</updated>
+    <updated>2014-05-04T19:46:53+08:00</updated>
     <id>http://msching.github.io/blog/2014/05/04/secret-of-avaudioplayer</id>
     <content type="html"><![CDATA[<h1>问题</h1>
 

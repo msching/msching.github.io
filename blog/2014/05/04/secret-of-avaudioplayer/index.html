@@ -3,11 +3,15 @@
 <html>
 <head>
 	<meta charset="utf-8">
-	<title>AVAudioPlayer的小秘密 - Secret of AVAudioPlayer - 码农人生</title>
+	<title>AVAudioPlayer的小秘密 - 码农人生</title>
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="AVAudioPlayer的小秘密 - Secret of AVAudioPlayer 问题 前两天公司有一位同事在使用AVAudioPlayer的过程中遇到了这样一个问题： 他需要播放一段网络上的音频，实现策略是把音频下载到本地，然后使用AVAudioPlayer进行播放。代码大致是这样的： &hellip;">
+	<meta name="description" content="AVAudioPlayer的小秘密 问题 前两天公司有一位同事在使用AVAudioPlayer的过程中遇到了这样一个问题： 他需要播放一段网络上的音频，实现策略是把音频下载到本地，然后使用AVAudioPlayer进行播放。代码大致是这样的： 1
+2
+3
+4
+NSString *path &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,7 +80,7 @@
 			
 			<div class="mid-col-container">
 				<div id="content" class="inner"><article class="post" itemscope itemtype="http://schema.org/BlogPosting">
-	<h1 class="title" itemprop="name">AVAudioPlayer的小秘密 - Secret of AVAudioPlayer</h1>
+	<h1 class="title" itemprop="name">AVAudioPlayer的小秘密</h1>
 	<div class="entry-content" itemprop="articleBody"><h1>问题</h1>
 
 <p>前两天公司有一位同事在使用AVAudioPlayer的过程中遇到了这样一个问题：</p>
@@ -196,6 +200,10 @@ Thanks for the Tip! –  mtmurdock Mar 19 '11 at 0:26
 
 <p>如果上述方法帮不了你，那么就只能去检查文件格式有没有问题或者采用其他的实现方式进行尝试了（比如<code>AVPlayer</code>和<code>AudioToolBox</code>）。不管怎么说，客户端所能做的只是尽量减少错误发生的频率，最终解决这类问题还是需要音频文件的提供者确保音频文件的格式符合标准没有错误和缺陷。</p>
 </div>
+	
+		<br>
+<br>原创文章，版权声明：自由转载-非商用-非衍生-保持署名 | <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.zh">Creative Commons BY-NC-ND 3.0</a></br>
+	
 
 </article>
 

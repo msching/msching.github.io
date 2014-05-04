@@ -4,7 +4,7 @@
   <title><![CDATA[码农人生]]></title>
   <link href="http://msching.github.io/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-05-04T21:15:47+08:00</updated>
+  <updated>2014-05-05T01:13:25+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -14,15 +14,141 @@
 
   
   <entry>
-    <title type="html"><![CDATA[ASIHTTPRequest iOS7下内存泄漏问题解决记录- leak of ASIHTTPRequest on iOS7]]></title>
-    <link href="http://msching.github.io/blog/2014/05/04/leak-of-asihttprequest-on-ios7/"/>
+    <title type="html"><![CDATA[AVAudioPlayer的小秘密]]></title>
+    <link href="http://msching.github.io/blog/2014/05/04/secret-of-avaudioplayer/"/>
     <updated>2014-05-04T19:46:53+08:00</updated>
+    <id>http://msching.github.io/blog/2014/05/04/secret-of-avaudioplayer</id>
+    <content type="html"><![CDATA[<h1>问题</h1>
+
+<p>前两天公司有一位同事在使用AVAudioPlayer的过程中遇到了这样一个问题：</p>
+
+<p>他需要播放一段网络上的音频，实现策略是把音频下载到本地，然后使用AVAudioPlayer进行播放。代码大致是这样的：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">NSString</span> <span class="o">*</span><span class="n">path</span> <span class="o">=</span> <span class="p">...</span><span class="o">/</span><span class="n">xxx</span><span class="p">.</span><span class="n">mp3</span><span class="p">;</span> <span class="c1">//mp3 file path</span>
+</span><span class='line'><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSData</span> <span class="nl">dataWithContentsOfURL:</span><span class="p">[</span><span class="n">NSURL</span> <span class="nl">fileURLWithPath:</span><span class="n">path</span><span class="p">]];</span>
+</span><span class='line'><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'><span class="n">AVAudioPlayer</span> <span class="o">*</span><span class="n">player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">AVAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithData:</span><span class="n">data</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>但他在init AVAudioPlayer时遇到了下面的错误。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">Error</span> <span class="n">Domain</span><span class="o">=</span><span class="n">NSOSStatusErrorDomain</span> <span class="n">Code</span><span class="o">=</span><span class="mi">1937337955</span> <span class="s">&quot;The operation couldn’t be completed. (OSStatus error 1937337955.)&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>普遍的解决方法</h1>
+
+<p>在google搜索之后发现1937337955这个code并不少见，在<a href="http://stackoverflow.com/questions/4901709/iphone-avaudioplayer-unsupported-file-type">StackOverflow</a>上有人提问问到这个问题，国内的一些博客中也有提到（例如<a href="http://zhu340381425.blog.163.com/blog/static/75952514201192021013852">@我的桌子</a>和<a href="http://blog.sina.com.cn/s/blog_7cb9b3b80101d8ap.html">@SkyLine</a>）。</p>
+
+<p>其中提到的解决方法都一样，就是使用AVAudioPlayer的另一个init方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithContentsOfURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>于是尝试修改了代码：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">NSString</span> <span class="o">*</span><span class="n">path</span> <span class="o">=</span> <span class="p">...</span><span class="o">/</span><span class="n">xxx</span><span class="p">.</span><span class="n">mp3</span><span class="p">;</span> <span class="c1">//mp3 file path</span>
+</span><span class='line'><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'><span class="n">AVAudioPlayer</span> <span class="o">*</span><span class="n">player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">AVAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithContentsOfURL:</span><span class="p">[</span><span class="n">NSURL</span> <span class="nl">fileURLWithPath:</span><span class="n">path</span><span class="p">]</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>果然没有出现错误，player成功创建并且能够播放。</p>
+
+<hr />
+
+<h1>深究</h1>
+
+<p>不能播放的问题到这里已经fix了，但这个问题本身还没有完结，为什么使用<code>-initWithContentsOfURL:error:</code>方法就可以播呢？这个时候也许有的人会认为这是一个apple的bug，认为<code>-initWithContentsOfURL:error:</code>方法比<code>-initWithData::error:</code>具有更好的适应性。</p>
+
+<pre><code>Oh that's very interesting. Perhaps that should be submitted to Apple as a bug? 
+In the end I opted for the saved file anyways because it fit better with what we were trying to do. 
+Thanks for the Tip! –  mtmurdock Mar 19 '11 at 0:26
+</code></pre>
+
+<p>但凡事遇到错误，都应该先从自身开始找原因。经过搜索发现，1937337955这个Errorcode其实就是<code>kAudioFileUnsupportedFileTypeError</code>，一般出现在文件格式不符合规范的情况下。假设apple并没有写出bug的话，那么上述问题中的这个mp3一定在文件格式上有缺陷，最终导致了<code>-initWithData::error:</code>方法返回错误，而<code>-initWithContentsOfURL:error:</code>采用某种方式规避了这个格式缺陷。</p>
+
+<p>回过头去查看<code>AVAudioPlayer.h</code>头文件可以看到SDK7中多了两个init方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="cm">/* The file type hint is a constant defined in AVMediaFormat.h whose value is a UTI for a file format. e.g. AVFileTypeAIFF. */</span>
+</span><span class='line'><span class="cm">/* Sometimes the type of a file cannot be determined from the data, or it is actually corrupt.</span>
+</span><span class='line'><span class="cm">The file type hint tells the parser what kind of data to look for so that files which are not self identifying or possibly even corrupt can be successfully parsed. */</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithContentsOfURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="nf">fileTypeHint:</span><span class="p">(</span><span class="n">NSString</span><span class="o">*</span><span class="p">)</span><span class="nv">utiString</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_AVAILABLE</span><span class="p">(</span><span class="mi">10</span><span class="n">_9</span><span class="p">,</span> <span class="mi">7</span><span class="n">_0</span><span class="p">);</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithData:</span><span class="p">(</span><span class="n">NSData</span> <span class="o">*</span><span class="p">)</span><span class="nv">data</span> <span class="nf">fileTypeHint:</span><span class="p">(</span><span class="n">NSString</span><span class="o">*</span><span class="p">)</span><span class="nv">utiString</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_AVAILABLE</span><span class="p">(</span><span class="mi">10</span><span class="n">_9</span><span class="p">,</span> <span class="mi">7</span><span class="n">_0</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>多出来的这个hint参数和<code>AudioToolbox</code>framework中<code>AudioFileStream</code>、<code>AudioFile</code>两个类的Open方法中所使用的hint参数作用一样，可以辅助系统判定当前的文件格式。</p>
+
+<p>接下来尝试在iOS7系统下使用新的init方法生成AVAudioPlayer：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">NSString</span> <span class="o">*</span><span class="n">path</span> <span class="o">=</span> <span class="p">...</span><span class="o">/</span><span class="n">xxx</span><span class="p">.</span><span class="n">mp3</span><span class="p">;</span> <span class="c1">//mp3 file path</span>
+</span><span class='line'><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSData</span> <span class="nl">dataWithContentsOfURL:</span><span class="p">[</span><span class="n">NSURL</span> <span class="nl">fileURLWithPath:</span><span class="n">path</span><span class="p">]];</span>
+</span><span class='line'><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'><span class="n">AVAudioPlayer</span> <span class="o">*</span><span class="n">player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">AVAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithData:</span><span class="n">data</span> <span class="nl">fileTypeHint:</span><span class="n">AVFileTypeMPEGLayer3</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>结果没有错误产生，没有出现错误，player成功创建并且能够播放。</p>
+
+<p>进而进行另两个实验：</p>
+
+<ol>
+<li>把保存文件时的.mp3后缀去掉后使用<code>-initWithContentsOfURL:error:</code>生成对象，结果发现产生了错误。</li>
+<li>把保存文件时的.mp3后缀改为.wav后使用<code>-initWithContentsOfURL:error:</code>生成对象，结果发现产生了错误。</li>
+</ol>
+
+
+<p>于是确定<code>-initWithContentsOfURL:error:</code>方法是利用后缀名作为hintType对文件的解码进行辅助，而<code>-initWithData::error:</code>方法由于没有任何hint并且文件本身格式又有缺陷导致错误的产生。</p>
+
+<hr />
+
+<h1>更完整的解决方法</h1>
+
+<p>基于以上分析可以得出一个更为完整的解决方法，可以有效的规避这一类错误：</p>
+
+<ol>
+<li>对于iOS7以上的系统（含iOS7）,在确定文件格式的情况下可以使用<code>initWithData:fileTypeHint:error:</code>和<code>initWithContentsOfURL:fileTypeHint:error:</code>生成实例，或者把data保存为对应后缀名的文件后使用<code>-initWithContentsOfURL:error:</code>后再生成实例；</li>
+<li>对于iOS7以下的系统，在确定文件格式的情况下，最为安全的方法是把data保存为对应后缀名的文件后使用<code>-initWithContentsOfURL:error:</code>生成实例；</li>
+</ol>
+
+
+<p>如果上述方法帮不了你，那么就只能去检查文件格式有没有问题或者采用其他的实现方式进行尝试了（比如<code>AVPlayer</code>和<code>AudioToolBox</code>）。不管怎么说，客户端所能做的只是尽量减少错误发生的频率，最终解决这类问题还是需要音频文件的提供者确保音频文件的格式符合标准没有错误和缺陷。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[ASIHTTPRequest iOS7下内存泄漏问题解决记录]]></title>
+    <link href="http://msching.github.io/blog/2014/05/04/leak-of-asihttprequest-on-ios7/"/>
+    <updated>2014-05-04T14:43:40+08:00</updated>
     <id>http://msching.github.io/blog/2014/05/04/leak-of-asihttprequest-on-ios7</id>
     <content type="html"><![CDATA[<hr />
 
-<p>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</p>
+<h3>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</h3>
 
-<p>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</p>
+<h3>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</h3>
 
 <hr />
 
@@ -155,11 +281,11 @@ I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary
 
 <p>这些方法的作用大家可以参考链接：<a href="http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/">http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/</a>。</p>
 
-<p>简单的说就是NSInputStream需要同时支持 <strong>NSRunLoop</strong> 和 <strong>CFRunLoopRef</strong> 的schedule和unschedule方法，那几个私有方法就是负责CFRunLoopRef的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的release方法，iOS6下它的堆栈中正好有CFRunLoop的一些方法。莫非这就是ASIInputStream内存泄漏的原因所在？</p>
+<p>简单的说就是<code>NSInputStream</code>需要同时支持<code>NSRunLoop</code>和<code>CFRunLoopRef</code>的schedule和unschedule方法，那几个私有方法就是负责<code>CFRunLoopRef</code>的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的<code>release</code>方法，iOS6下它的堆栈中正好有<code>CFRunLoopRef</code>的一些方法。莫非这就是<code>ASIInputStream</code>内存泄漏的原因所在？</p>
 
-<p>我当时的猜测是，iOS7下的内存泄漏是ASIInputStream伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但ASIInputStream的功能依然存在，HTTP请求并未因此失效，这说明ASIInputStream还是被bridge成了CFReadStream，但只是因为少了和NSInputStream一样的unschedule方法导致其没有被正常unschedule。如果我把ASIInputStream的unschedule方法补上是否就可以解决问题？</p>
+<p>我当时的猜测是，iOS7下的内存泄漏是<code>ASIInputStream</code>伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但<code>ASIInputStream</code>的功能依然存在，HTTP请求并未因此失效，这说明<code>ASIInputStream</code>还是被bridge成了<code>CFReadStream</code>，但只是因为少了和<code>NSInputStream</code>一样的unschedule方法导致其没有被正常unschedule。如果我把<code>ASIInputStream</code>的unschedule方法补上是否就可以解决问题？</p>
 
-<p>我把上述的几个方法在ASIInputStream中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在ASIInputStream的release方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把&#8221;_&ldquo;去掉了）。</p>
+<p>我把上述的几个方法在<code>ASIInputStream</code>中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在<code>ASIInputStream</code>的<code>release</code>方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把&#8221;_&ldquo;去掉了）。</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -206,9 +332,9 @@ I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请通过微博<a href="http://www.weibo.com/msching/">@程寅zju</a>告知。。感激不尽 ~_~</p>
+<p>至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请告知。。感激不尽 ~_~。</p>
 
-<p>附上修改过后的ASIInputStream代码<a href="https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330">https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330</a></p>
+<p>附上修改过后的<code>ASIInputStream</code><a href="https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330">代码</a></p>
 
 <hr />
 
@@ -219,133 +345,7 @@ I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[AVAudioPlayer的小秘密 - Secret of AVAudioPlayer]]></title>
-    <link href="http://msching.github.io/blog/2014/05/04/secret-of-avaudioplayer/"/>
-    <updated>2014-05-04T14:43:40+08:00</updated>
-    <id>http://msching.github.io/blog/2014/05/04/secret-of-avaudioplayer</id>
-    <content type="html"><![CDATA[<h1>问题</h1>
-
-<p>前两天公司有一位同事在使用AVAudioPlayer的过程中遇到了这样一个问题：</p>
-
-<p>他需要播放一段网络上的音频，实现策略是把音频下载到本地，然后使用AVAudioPlayer进行播放。代码大致是这样的：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">NSString</span> <span class="o">*</span><span class="n">path</span> <span class="o">=</span> <span class="p">...</span><span class="o">/</span><span class="n">xxx</span><span class="p">.</span><span class="n">mp3</span><span class="p">;</span> <span class="c1">//mp3 file path</span>
-</span><span class='line'><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSData</span> <span class="nl">dataWithContentsOfURL:</span><span class="p">[</span><span class="n">NSURL</span> <span class="nl">fileURLWithPath:</span><span class="n">path</span><span class="p">]];</span>
-</span><span class='line'><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
-</span><span class='line'><span class="n">AVAudioPlayer</span> <span class="o">*</span><span class="n">player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">AVAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithData:</span><span class="n">data</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>但他在init AVAudioPlayer时遇到了下面的错误。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">Error</span> <span class="n">Domain</span><span class="o">=</span><span class="n">NSOSStatusErrorDomain</span> <span class="n">Code</span><span class="o">=</span><span class="mi">1937337955</span> <span class="s">&quot;The operation couldn’t be completed. (OSStatus error 1937337955.)&quot;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<hr />
-
-<h1>普遍的解决方法</h1>
-
-<p>在google搜索之后发现1937337955这个code并不少见，在<a href="http://stackoverflow.com/questions/4901709/iphone-avaudioplayer-unsupported-file-type">StackOverflow</a>上有人提问问到这个问题，国内的一些博客中也有提到（例如<a href="http://zhu340381425.blog.163.com/blog/static/75952514201192021013852">@我的桌子</a>和<a href="http://blog.sina.com.cn/s/blog_7cb9b3b80101d8ap.html">@SkyLine</a>）。</p>
-
-<p>其中提到的解决方法都一样，就是使用AVAudioPlayer的另一个init方法：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithContentsOfURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span><span class="p">;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>于是尝试修改了代码：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">NSString</span> <span class="o">*</span><span class="n">path</span> <span class="o">=</span> <span class="p">...</span><span class="o">/</span><span class="n">xxx</span><span class="p">.</span><span class="n">mp3</span><span class="p">;</span> <span class="c1">//mp3 file path</span>
-</span><span class='line'><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
-</span><span class='line'><span class="n">AVAudioPlayer</span> <span class="o">*</span><span class="n">player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">AVAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithContentsOfURL:</span><span class="p">[</span><span class="n">NSURL</span> <span class="nl">fileURLWithPath:</span><span class="n">path</span><span class="p">]</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>果然没有出现错误，player成功创建并且能够播放。</p>
-
-<hr />
-
-<h1>深究</h1>
-
-<p>不能播放的问题到这里已经fix了，但这个问题本身还没有完结，为什么使用<code>-initWithContentsOfURL:error:</code>方法就可以播呢？这个时候也许有的人会认为这是一个apple的bug，认为<code>-initWithContentsOfURL:error:</code>方法比<code>-initWithData::error:</code>具有更好的适应性。</p>
-
-<pre><code>Oh that's very interesting. Perhaps that should be submitted to Apple as a bug? 
-In the end I opted for the saved file anyways because it fit better with what we were trying to do. 
-Thanks for the Tip! –  mtmurdock Mar 19 '11 at 0:26
-</code></pre>
-
-<p>但凡事遇到错误，都应该先从自身开始找原因。经过搜索发现，1937337955这个Errorcode其实就是<code>kAudioFileUnsupportedFileTypeError</code>，一般出现在文件格式不符合规范的情况下。假设apple并没有写出bug的话，那么上述问题中的这个mp3一定在文件格式上有缺陷，最终导致了<code>-initWithData::error:</code>方法返回错误，而<code>-initWithContentsOfURL:error:</code>采用某种方式规避了这个格式缺陷。</p>
-
-<p>回过头去查看<code>AVAudioPlayer.h</code>头文件可以看到SDK7中多了两个init方法：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="cm">/* The file type hint is a constant defined in AVMediaFormat.h whose value is a UTI for a file format. e.g. AVFileTypeAIFF. */</span>
-</span><span class='line'><span class="cm">/* Sometimes the type of a file cannot be determined from the data, or it is actually corrupt.</span>
-</span><span class='line'><span class="cm">The file type hint tells the parser what kind of data to look for so that files which are not self identifying or possibly even corrupt can be successfully parsed. */</span>
-</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithContentsOfURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="nf">fileTypeHint:</span><span class="p">(</span><span class="n">NSString</span><span class="o">*</span><span class="p">)</span><span class="nv">utiString</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_AVAILABLE</span><span class="p">(</span><span class="mi">10</span><span class="n">_9</span><span class="p">,</span> <span class="mi">7</span><span class="n">_0</span><span class="p">);</span>
-</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithData:</span><span class="p">(</span><span class="n">NSData</span> <span class="o">*</span><span class="p">)</span><span class="nv">data</span> <span class="nf">fileTypeHint:</span><span class="p">(</span><span class="n">NSString</span><span class="o">*</span><span class="p">)</span><span class="nv">utiString</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_AVAILABLE</span><span class="p">(</span><span class="mi">10</span><span class="n">_9</span><span class="p">,</span> <span class="mi">7</span><span class="n">_0</span><span class="p">);</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>多出来的这个hint参数和<code>AudioToolbox</code>framework中<code>AudioFileStream</code>、<code>AudioFile</code>两个类的Open方法中所使用的hint参数作用一样，可以辅助系统判定当前的文件格式。</p>
-
-<p>接下来尝试在iOS7系统下使用新的init方法生成AVAudioPlayer：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="n">NSString</span> <span class="o">*</span><span class="n">path</span> <span class="o">=</span> <span class="p">...</span><span class="o">/</span><span class="n">xxx</span><span class="p">.</span><span class="n">mp3</span><span class="p">;</span> <span class="c1">//mp3 file path</span>
-</span><span class='line'><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSData</span> <span class="nl">dataWithContentsOfURL:</span><span class="p">[</span><span class="n">NSURL</span> <span class="nl">fileURLWithPath:</span><span class="n">path</span><span class="p">]];</span>
-</span><span class='line'><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
-</span><span class='line'><span class="n">AVAudioPlayer</span> <span class="o">*</span><span class="n">player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">AVAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithData:</span><span class="n">data</span> <span class="nl">fileTypeHint:</span><span class="n">AVFileTypeMPEGLayer3</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>结果没有错误产生，没有出现错误，player成功创建并且能够播放。</p>
-
-<p>进而进行另两个实验：</p>
-
-<ol>
-<li>把保存文件时的.mp3后缀去掉后使用<code>-initWithContentsOfURL:error:</code>生成对象，结果发现产生了错误。</li>
-<li>把保存文件时的.mp3后缀改为.wav后使用<code>-initWithContentsOfURL:error:</code>生成对象，结果发现产生了错误。</li>
-</ol>
-
-
-<p>于是确定<code>-initWithContentsOfURL:error:</code>方法是利用后缀名作为hintType对文件的解码进行辅助，而<code>-initWithData::error:</code>方法由于没有任何hint并且文件本身格式又有缺陷导致错误的产生。</p>
-
-<hr />
-
-<h1>更完整的解决方法</h1>
-
-<p>基于以上分析可以得出一个更为完整的解决方法，可以有效的规避这一类错误：</p>
-
-<ol>
-<li>对于iOS7以上的系统（含iOS7）,在确定文件格式的情况下可以使用<code>initWithData:fileTypeHint:error:</code>和<code>initWithContentsOfURL:fileTypeHint:error:</code>生成实例，或者把data保存为对应后缀名的文件后使用<code>-initWithContentsOfURL:error:</code>后再生成实例；</li>
-<li>对于iOS7以下的系统，在确定文件格式的情况下，最为安全的方法是把data保存为对应后缀名的文件后使用<code>-initWithContentsOfURL:error:</code>生成实例；</li>
-</ol>
-
-
-<p>如果上述方法帮不了你，那么就只能去检查文件格式有没有问题或者采用其他的实现方式进行尝试了（比如<code>AVPlayer</code>和<code>AudioToolBox</code>）。不管怎么说，客户端所能做的只是尽量减少错误发生的频率，最终解决这类问题还是需要音频文件的提供者确保音频文件的格式符合标准没有错误和缺陷。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[基于Github和Octopress搭建属于自己的博客 - Blog based on Github & Octopress]]></title>
+    <title type="html"><![CDATA[基于Github和Octopress搭建属于自己的博客]]></title>
     <link href="http://msching.github.io/blog/2014/04/11/starting/"/>
     <updated>2014-04-11T14:10:07+08:00</updated>
     <id>http://msching.github.io/blog/2014/04/11/starting</id>

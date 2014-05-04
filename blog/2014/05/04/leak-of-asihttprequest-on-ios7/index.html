@@ -3,11 +3,11 @@
 <html>
 <head>
 	<meta charset="utf-8">
-	<title>ASIHTTPRequest iOS7下内存泄漏问题解决记录- leak of ASIHTTPRequest on iOS7 - 码农人生</title>
+	<title>ASIHTTPRequest iOS7下内存泄漏问题解决记录 - 码农人生</title>
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="ASIHTTPRequest iOS7下内存泄漏问题解决记录- Leak of ASIHTTPRequest on iOS7 这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。 &hellip;">
+	<meta name="description" content="ASIHTTPRequest iOS7下内存泄漏问题解决记录 这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。 现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核， &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,12 +76,12 @@
 			
 			<div class="mid-col-container">
 				<div id="content" class="inner"><article class="post" itemscope itemtype="http://schema.org/BlogPosting">
-	<h1 class="title" itemprop="name">ASIHTTPRequest iOS7下内存泄漏问题解决记录- Leak of ASIHTTPRequest on iOS7</h1>
+	<h1 class="title" itemprop="name">ASIHTTPRequest iOS7下内存泄漏问题解决记录</h1>
 	<div class="entry-content" itemprop="articleBody"><hr />
 
-<p>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</p>
+<h3>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</h3>
 
-<p>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</p>
+<h3>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</h3>
 
 <hr />
 
@@ -214,11 +214,11 @@ I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary
 
 <p>这些方法的作用大家可以参考链接：<a href="http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/">http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/</a>。</p>
 
-<p>简单的说就是NSInputStream需要同时支持 <strong>NSRunLoop</strong> 和 <strong>CFRunLoopRef</strong> 的schedule和unschedule方法，那几个私有方法就是负责CFRunLoopRef的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的release方法，iOS6下它的堆栈中正好有CFRunLoop的一些方法。莫非这就是ASIInputStream内存泄漏的原因所在？</p>
+<p>简单的说就是<code>NSInputStream</code>需要同时支持<code>NSRunLoop</code>和<code>CFRunLoopRef</code>的schedule和unschedule方法，那几个私有方法就是负责<code>CFRunLoopRef</code>的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的<code>release</code>方法，iOS6下它的堆栈中正好有<code>CFRunLoopRef</code>的一些方法。莫非这就是<code>ASIInputStream</code>内存泄漏的原因所在？</p>
 
-<p>我当时的猜测是，iOS7下的内存泄漏是ASIInputStream伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但ASIInputStream的功能依然存在，HTTP请求并未因此失效，这说明ASIInputStream还是被bridge成了CFReadStream，但只是因为少了和NSInputStream一样的unschedule方法导致其没有被正常unschedule。如果我把ASIInputStream的unschedule方法补上是否就可以解决问题？</p>
+<p>我当时的猜测是，iOS7下的内存泄漏是<code>ASIInputStream</code>伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但<code>ASIInputStream</code>的功能依然存在，HTTP请求并未因此失效，这说明<code>ASIInputStream</code>还是被bridge成了<code>CFReadStream</code>，但只是因为少了和<code>NSInputStream</code>一样的unschedule方法导致其没有被正常unschedule。如果我把<code>ASIInputStream</code>的unschedule方法补上是否就可以解决问题？</p>
 
-<p>我把上述的几个方法在ASIInputStream中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在ASIInputStream的release方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把&#8221;_&ldquo;去掉了）。</p>
+<p>我把上述的几个方法在<code>ASIInputStream</code>中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在<code>ASIInputStream</code>的<code>release</code>方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把&#8221;_&ldquo;去掉了）。</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -265,9 +265,9 @@ I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请通过微博<a href="http://www.weibo.com/msching/">@程寅zju</a>告知。。感激不尽 ~_~</p>
+<p>至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请告知。。感激不尽 ~_~。</p>
 
-<p>附上修改过后的ASIInputStream代码<a href="https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330">https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330</a></p>
+<p>附上修改过后的<code>ASIInputStream</code><a href="https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330">代码</a></p>
 
 <hr />
 
@@ -275,6 +275,10 @@ I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary
 
 <p>问题没解决的时候其他同事建议我更换成AFNetworking等等其他开源库，因为这些库更新快文档全，ASIHTTPRequest接口复杂、代码繁多而且如今已年久失修无人维护了。确实如此，但由于一些项目上的原因我们无法更换，况且ASIHTTRequest在效率上略好，并且拥有其他基于NSURLConnection的库不具备一些功能。在解决问题的过程中也让我对NSInputStream的工作机制有了更深的理解，可谓一石二鸟。由于鄙人能力有限，其中一些地方可能说的有错误或者有纰漏的话还请大神们指正:)</p>
 </div>
+	
+		<br>
+<br>原创文章，版权声明：自由转载-非商用-非衍生-保持署名 | <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.zh">Creative Commons BY-NC-ND 3.0</a></br>
+	
 
 </article>
 
