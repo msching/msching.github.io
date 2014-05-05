@@ -22,6 +22,7 @@
 	</div>
 	<h1 class="title" itemprop="name">{% if site.titlecase %}{{ page.title | titlecase }}{% else %}{{ page.title }}{% endif %}</h1>
 	<p class="subtitle" itemprop="name">{% if site.titlecase %}{{ page.subtitle | titlecase }}{% else %}{{ page.subtitle }}{% endif %}</p>
+	<hr />
 	<div class="entry-content" itemprop="articleBody">{{ content }}</div>
 	{% if page.statement == true %}
 		{% include post/statement.html %}
