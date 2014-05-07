@@ -1,7 +1,7 @@
 ---
 layout: post
-title: "AVAudioPlayer的小秘密"
-subtitle: "Secret of AVAudioPlayer"
+title: "AVAudioPlayer的1937337955错误研究"
+subtitle: "Fix error with code 1937337955 of AVAudioPlayer"
 date: 2014-05-04 19:46:53 +0800
 comments: true
 statement: true
