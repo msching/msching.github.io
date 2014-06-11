@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-05-07T17:49:01+08:00</updated>
+  <updated>2014-06-11T13:34:13+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,15 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[合并生成模拟器和真机通用的framework]]></title>
+    <link href="http://msching.github.io/blog/2014/05/05/custom-framework-merging/"/>
+    <updated>2014-05-05T17:58:00+08:00</updated>
+    <id>http://msching.github.io/blog/2014/05/05/custom-framework-merging</id>
+    <content type="html"><![CDATA[
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[AVAudioPlayer的1937337955错误研究]]></title>
