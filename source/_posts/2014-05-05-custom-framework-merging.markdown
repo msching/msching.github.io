@@ -5,5 +5,5 @@ subtitle: "Custom framework merging"
 date: 2014-05-05 17:58:00 +0800
 comments: true
 statement: true
-categories: 
+categories: [iOS]
 ---
