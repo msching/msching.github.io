@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-06-11T17:33:38+08:00</updated>
+  <updated>2014-06-20T19:15:47+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -18,7 +18,38 @@
     <link href="http://msching.github.io/blog/2014/05/05/custom-framework-merging/"/>
     <updated>2014-05-05T17:58:00+08:00</updated>
     <id>http://msching.github.io/blog/2014/05/05/custom-framework-merging</id>
-    <content type="html"><![CDATA[
+    <content type="html"><![CDATA[<p>在使用<a href="https://github.com/kstenerud/iOS-Universal-Framework">iOS-Universal-Framework</a>制作framework的过程中经常会遇到编译出来的framework只能被真机使用或者只能被模拟器使用的情况。</p>
+
+<p>造成这个问题的原因是由于在编译时选择的目标设备不同的情况下编译出来framework体系结构不同，选择真机进行编辑时会编译产生<code>armv7</code>、<code>armv7s</code>、<code>arm64</code>下的库文件，而选择模拟器会产生<code>i386</code>、<code>x86_64</code>下的库文件。
+具体查看的方法可以执行下列命令：</p>
+
+<p>```
+$ lipo -info /Debug-iphoneos/Someframework.framwork/Someframework</p>
+
+<h1>Architectures in the fat file: Someframework are: armv7 arm64</h1>
+
+<p>$ lipo -info /Debug-iphonesimulator/Someframework.framwork/Someframework</p>
+
+<h1>Architectures in the fat file: Someframework are: i386 x86_64</h1>
+
+<p>```</p>
+
+<p>要同时对模拟器和真机进行支持，只要对两个编译出来的framework进行合并就可以了。</p>
+
+<p>执行如下命令就可以进行合并</p>
+
+<p><code>
+$ lipo –create /Debug-iphoneos/Someframework.framwork/Someframework Debug-iphonesimulator/Someframework.framwork/Someframework –output Someframework
+</code></p>
+
+<p>完成后再查看framework的版本</p>
+
+<p>```
+$ lipo -info Someframework</p>
+
+<h1>Architectures in the fat file: Someframework are: armv7 arm64 i386 x86_64</h1>
+
+<p>```</p>
 ]]></content>
   </entry>
   

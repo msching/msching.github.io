@@ -7,7 +7,7 @@
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="May 5th, 2014 iOS 合并生成模拟器和真机通用的framework May 4th, 2014 Audio, iOS AVAudioPlayer的1937337955错误研究 问题 前两天公司有一位同事在使用AVAudioPlayer的过程中遇到了这样一个问题： &hellip;">
+	<meta name="description" content="May 5th, 2014 iOS 合并生成模拟器和真机通用的framework 在使用iOS-Universal-Framework制作framework的过程中经常会遇到编译出来的framework只能被真机使用或者只能被模拟器使用的情况。 &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -106,7 +106,39 @@
 	</div>
 	<h1 class="title" itemprop="name"><a href="/blog/2014/05/05/custom-framework-merging/" itemprop="url">合并生成模拟器和真机通用的framework</a></h1>
 	<div class="entry-content" itemprop="articleBody">
-		
+		<p>在使用<a href="https://github.com/kstenerud/iOS-Universal-Framework">iOS-Universal-Framework</a>制作framework的过程中经常会遇到编译出来的framework只能被真机使用或者只能被模拟器使用的情况。</p>
+
+<p>造成这个问题的原因是由于在编译时选择的目标设备不同的情况下编译出来framework体系结构不同，选择真机进行编辑时会编译产生<code>armv7</code>、<code>armv7s</code>、<code>arm64</code>下的库文件，而选择模拟器会产生<code>i386</code>、<code>x86_64</code>下的库文件。
+具体查看的方法可以执行下列命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ lipo -info /Debug-iphoneos/Someframework.framwork/Someframework
+</span><span class='line'># Architectures in the fat file: Someframework are: armv7 arm64 
+</span><span class='line'>
+</span><span class='line'>$ lipo -info /Debug-iphonesimulator/Someframework.framwork/Someframework
+</span><span class='line'># Architectures in the fat file: Someframework are: i386 x86_64 
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>要同时对模拟器和真机进行支持，只要对两个编译出来的framework进行合并就可以了。</p>
+
+<p>执行如下命令就可以进行合并</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ lipo –create /Debug-iphoneos/Someframework.framwork/Someframework Debug-iphonesimulator/Someframework.framwork/Someframework –output Someframework</span></code></pre></td></tr></table></div></figure>
+
+
+<p>完成后再查看framework的版本</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ lipo -info Someframework
+</span><span class='line'># Architectures in the fat file: Someframework are: armv7 arm64 i386 x86_64</span></code></pre></td></tr></table></div></figure>
+
 
 		
 		
