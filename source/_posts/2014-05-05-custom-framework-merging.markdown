@@ -15,7 +15,7 @@ categories: [iOS]
 
 ```
 $ lipo -info /Debug-iphoneos/Someframework.framwork/Someframework
-# Architectures in the fat file: Someframework are: armv7 arm64 
+# Architectures in the fat file: Someframework are: armv7 armv7s arm64 
 
 $ lipo -info /Debug-iphonesimulator/Someframework.framwork/Someframework
 # Architectures in the fat file: Someframework are: i386 x86_64 
@@ -35,5 +35,5 @@ $ lipo –create /Debug-iphoneos/Someframework.framwork/Someframework Debug-ipho
 
 ```
 $ lipo -info Someframework
-# Architectures in the fat file: Someframework are: armv7 arm64 i386 x86_64
+# Architectures in the fat file: Someframework are: armv7 armv7s arm64 i386 x86_64
 ```
