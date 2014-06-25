@@ -4,7 +4,7 @@
   <title><![CDATA[码农人生]]></title>
   <link href="http://msching.github.io/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-06-23T14:05:57+08:00</updated>
+  <updated>2014-06-25T14:12:44+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,17 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[初始化AudioUnit的正确姿势]]></title>
+    <link href="http://msching.github.io/blog/2014/06/25/init-audiounit-when-app-is-in-background/"/>
+    <updated>2014-06-25T13:56:27+08:00</updated>
+    <id>http://msching.github.io/blog/2014/06/25/init-audiounit-when-app-is-in-background</id>
+    <content type="html"><![CDATA[<p>在使用AudioUnit的过程中发现当app在后台时调用<code>extern OSStatus AudioUnitInitialize(AudioUnit inUnit)</code>方法返回<code>561015905</code>错误码，解析成string后是<code>!pla</code>，google错误码后毫无收获，于是只能workaround。面对这个问题我的workaround是当出现初始化失败的情况下会在程序进入前台时再尝试调用<code>AudioUnitInitialize</code>方法来初始化AudioUnit。至此问题已经在一定程度上得到了解决，只要用户进入前台就可以正确初始化AudioUnit并且播放音乐。</p>
+
+<p>今天在应对某个用户反馈时发现某个用户反馈的某个建议正是因为后台init AudioUnit会失败导致程序无法入预期工作。于是灵光一闪，觉得在初始化AudioUnit之前先调用<code>AudioSessionInitialize</code>并setActive是否就可以解决问题。尝试之后发现果然可以&hellip;（之前都在AudioUnitInitialize成功后才去init audiosession）。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[合并生成模拟器和真机通用的framework]]></title>

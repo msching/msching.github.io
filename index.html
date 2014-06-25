@@ -7,7 +7,7 @@
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="May 5th, 2014 iOS 合并生成模拟器和真机通用的framework 在使用iOS-Universal-Framework制作framework的过程中经常会遇到编译出来的framework只能被真机使用或者只能被模拟器使用的情况。 &hellip;">
+	<meta name="description" content="Jun 25th, 2014 初始化AudioUnit的正确姿势 在使用AudioUnit的过程中发现当app在后台时调用extern OSStatus AudioUnitInitialize(AudioUnit inUnit)方法返回561015905错误码，解析成string后是!pla， &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,39 @@
 			<div class="mid-col-container">
 				<div id="content" class="inner">
 <div itemscope itemtype="http://schema.org/Blog">
+
+
+    <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-25T13:56:27+08:00" data-updated="true" itemprop="datePublished">Jun 25<span>th</span>, 2014</time></div>
+		<div class="tags">
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name"><a href="/blog/2014/06/25/init-audiounit-when-app-is-in-background/" itemprop="url">初始化AudioUnit的正确姿势</a></h1>
+	<div class="entry-content" itemprop="articleBody">
+		<p>在使用AudioUnit的过程中发现当app在后台时调用<code>extern OSStatus AudioUnitInitialize(AudioUnit inUnit)</code>方法返回<code>561015905</code>错误码，解析成string后是<code>!pla</code>，google错误码后毫无收获，于是只能workaround。面对这个问题我的workaround是当出现初始化失败的情况下会在程序进入前台时再尝试调用<code>AudioUnitInitialize</code>方法来初始化AudioUnit。至此问题已经在一定程度上得到了解决，只要用户进入前台就可以正确初始化AudioUnit并且播放音乐。</p>
+
+<p>今天在应对某个用户反馈时发现某个用户反馈的某个建议正是因为后台init AudioUnit会失败导致程序无法入预期工作。于是灵光一闪，觉得在初始化AudioUnit之前先调用<code>AudioSessionInitialize</code>并setActive是否就可以解决问题。尝试之后发现果然可以&hellip;（之前都在AudioUnitInitialize成功后才去init audiosession）。</p>
+
+		
+		
+	</div>
+
+</article>
 
 
     <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
