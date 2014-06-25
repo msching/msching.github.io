@@ -5,7 +5,7 @@ subtitle: "init AudioUnit when app is in background"
 date: 2014-06-25 13:56:27 +0800
 comments: true
 statement: true
-categories: 
+categories: [iOS,Audio]
 ---
 在使用AudioUnit的过程中发现当app在后台时调用`extern OSStatus AudioUnitInitialize(AudioUnit inUnit)`方法返回`561015905`错误码，解析成string后是`!pla`，google错误码后毫无收获，于是只能workaround。面对这个问题我的workaround是当出现初始化失败的情况下会在程序进入前台时再尝试调用`AudioUnitInitialize`方法来初始化AudioUnit。至此问题已经在一定程度上得到了解决，只要用户进入前台就可以正确初始化AudioUnit并且播放音乐。
 
