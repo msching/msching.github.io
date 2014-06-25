@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "初始化AudioUnit的正确姿势"
-subtitle: "init audiounit when app is in background"
+subtitle: "init AudioUnit when app is in background"
 date: 2014-06-25 13:56:27 +0800
 comments: true
 statement: true
