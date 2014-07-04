@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-06-26T16:36:33+08:00</updated>
+  <updated>2014-07-04T14:49:56+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,23 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[奇怪的Graphics消耗（iOS 7.1.x）]]></title>
+    <link href="http://msching.github.io/blog/2014/07/04/strange-high-graphics-cost-in-ios-7-dot-1-x/"/>
+    <updated>2014-07-04T14:25:31+08:00</updated>
+    <id>http://msching.github.io/blog/2014/07/04/strange-high-graphics-cost-in-ios-7-dot-1-x</id>
+    <content type="html"><![CDATA[<p>近期有部分用户反馈我们的app在使用时有发热现象，在排查原因的过程中发现了一个奇怪的问题。在某个页面推出时<code>Instruments</code>的<code>Core Animation</code>会有帧数显示，数值在59~60，而此时并没有任何需要消耗Graphics的代码在跑，所有UI都是静止的。这个现象只会在iOS 7.1.x上出现，其他系统包括最新发布的iOS8 beta上均没有出现类似问题。</p>
+
+<p>造成这个现象的页面比较特殊，其展现形式看上去虽然是一个UIViewController把一个UINavigationController用ModalView的形式push出来了，但实际上是把UINavigationController的.view直接add在了UIViewController的.view上，并用一个UIView动画展示页面。</p>
+
+<p>为了弄清楚到底为什么会在UI静止的情况下产生Graphics消耗，我新建了一个空工程用相同的方法实现了一个推出页面的动画，然后profile却没有发现有问题。再次回头看app发现这个推出页面的controller是个UITabBarController，于是为测试工程加上tabBarController后再次profile，问题重现了，Core Animation在页面出现之后显示了帧数，页面隐藏之后帧数显示就消失了，从而可以推断是UITabBarController上的某个UI元素导致了这个问题。</p>
+
+<p>接下来的步骤就是遍历UITabBarController的view上所有的subview并逐个隐藏来进行测试，幸运的是第一个就蒙对了，在我隐藏了UITabBarController的tabbar以后奇怪的帧数就不再出现了。这个现象很快让我想到了iOS 7以后苹果加入的模糊效果，这个效果在UINavigationBar、UITabBar、UIToolBar等UI控件上都有使用，下面把UITabBarController去掉，在view上直接add一个UIToolBar，发现问题同样会出现。至此基本确定是由于这个模糊效果造成的，至于为什么只会在7.1.x上出现这个问题。。可能只有苹果才知道了=。=。</p>
+
+<p>测试程序代码点<a href="https://github.com/msching/TestGPU">这里</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS8beta1下WebCore可能会打断音频播放]]></title>
@@ -214,181 +231,6 @@ AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithData:data fileTypeHint:AV
 
 
 <p>如果上述方法帮不了你，那么就只能去检查文件格式有没有问题或者采用其他的实现方式进行尝试了（比如<code>AVPlayer</code>和<code>AudioToolBox</code>）。不管怎么说，客户端所能做的只是尽量减少错误发生的频率，最终解决这类问题还是需要音频文件的提供者确保音频文件的格式符合标准没有错误和缺陷。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ASIHTTPRequest iOS7下内存泄漏问题解决记录]]></title>
-    <link href="http://msching.github.io/blog/2014/05/04/leak-of-asihttprequest-on-ios7/"/>
-    <updated>2014-05-04T14:43:40+08:00</updated>
-    <id>http://msching.github.io/blog/2014/05/04/leak-of-asihttprequest-on-ios7</id>
-    <content type="html"><![CDATA[<hr />
-
-<h3>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</h3>
-
-<h3>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</h3>
-
-<hr />
-
-<h1>发现问题</h1>
-
-<p>iOS7发布后，我们对产品进行了iOS7的适配。适配完成之后的某天，我使用Leaks对产品的新版本进行内存泄漏检测时发现ASIHTTPRequest存在内存泄漏问题，当时使用的设备是iTouch5，系统为iOS7.0.2。</p>
-
-<p><strong>Leaks检测结果</strong></p>
-
-<p><img src="http://ww3.sinaimg.cn/large/7d97a68cgw1eb8uxr5ui3j20sl068acm.jpg" alt="Leaks" /></p>
-
-<p>(ps:使用的是ASIHTTPRequest iPhoneSample的检测图，结果是一样的)</p>
-
-<p>发现之初，我以为是某处ASIHTTPRequest使用不当导致的泄漏，于是把leaks中的堆栈全部都检查了一边，但没有发现任何产品工程中的代码（其中一处泄漏的堆栈如图）。</p>
-
-<p><strong>Leaks中StackTrace结果</strong></p>
-
-<p><img src="http://ww2.sinaimg.cn/large/7d97a68cgw1eb8uxtkz79j209s0gnmz2.jpg" alt="StackTrace" /></p>
-
-<p>由于在iOS7发布之前的所有版本中并未看到类似的内存泄漏，所以我就开始怀疑是ASIHTTPRequest在iOS7才产生的。于是我在iOS5和iOS6的设备上进行了Leak Profile，结果没有发现任何泄漏。</p>
-
-<p>对于这样的结果我仍然不是很确信，因为项目的需要我们对ASIHTTPRequest进行了一定的定制，修改了其中一部分代码。为了确定问题确实是出在ASIHTTPRequest上，我去github上翻出了ASIHTTPRequest的repo，pull了最新的代码，用Leaks在iOS7系统上进行了profile。在profile过程中我对iPhone Sample中的每个Tab以此进行了测试，结果在<strong>Synchronous</strong>和<strong>Queue</strong>上并没有发现内存泄漏，在<strong>Upload</strong>上发现了和之前一样泄漏。随后在iOS5和iOS6上也进行了一样的测试，结果依然是没有任何泄漏。</p>
-
-<p>自此确定了这是ASIHTTPRequest在iOS7下特有的内存泄漏，并且只会出现在有POST body的情况下。</p>
-
-<hr />
-
-<h1>寻找解答</h1>
-
-<p>发现问题之后，我仔细查看了Leaks Profile的结果，发现泄漏集中在<code>ASIInputStream</code>上，应该是在使用的过程中<code>release</code>方法在某种情况下没有被调用到。于是我重写了ASIIputStream的release方法并在其中断点，分别在iOS7和iOS6进行调试后发现iOS7比iOS6少了一次Release的调用，堆栈如图所示。</p>
-
-<p><strong>缺少的Release的断点Stack Trace结果</strong></p>
-
-<p><img src="http://ww3.sinaimg.cn/large/7d97a68cgw1eb8uxssluaj20dd0bsab3.jpg" alt="Release" /></p>
-
-<p>从堆栈来看似乎是 <code>CoreReadStreamFromCFReadStream</code> 这个类的析构函数在iOS7下没有被调用到。当时就感觉没救了，这是私有类，想要强行触发析构似乎是不可能的，能做的就是尽量减少其中的泄漏。于是我们做了如下修改：</p>
-
-<p>```objective-c
-&ndash; (void)close
-{</p>
-
-<pre><code>[stream close];
-[stream release];
-stream = nil;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>修改了<code>ASIInputStream</code>的<code>close</code>方法，在close完成后把其中的<code>NSInputStream</code>对象release掉，以减少内存泄漏，同时保证ASIHTTPRequest不被重复使用（因为其中的NSInputStream已经被release了无法再使用）。</p>
-
-<p>这样一来泄漏有了一定的减少，如图。</p>
-
-<p><strong>修改后的Leaks检测结果</strong></p>
-
-<p><img src="http://ww2.sinaimg.cn/large/7d97a68cgw1eb8uxs8d4kj20su023q3r.jpg" alt="Leakss" /></p>
-
-<p>但这样并不能真正解决问题，泄漏依然存在，但我一时也想不到很好的办法，于是只能给repo发issue期望能够得到原作者的回复（虽然我知道希望不大，这哥们很久没管这事了- -）。
-这是我发的issue：<a href="https://github.com/pokeb/asi-http-request/issues/378">https://github.com/pokeb/asi-http-request/issues/378</a></p>
-
-<hr />
-
-<h1>解决问题</h1>
-
-<p>发issue大约一周后的某一天收到github的邮件，说有人回复我的issue了，进去一看有一个好心人这样解答道：</p>
-
-<pre><code>@mjohnson12
-
-The leak is because ASIInputStream is being cast to a CFReadStreamRef but ASIInputStream does not derive from NSInputStream it just wraps it.
-
-My Solution is to get rid of ASIInputStream and create a NSInputStream instead in the ASIHTTPRequest startRequest: method.
-
-It breaks using the metrics that ASIInputStream records but I wasn't using them.
-
-I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary.
-</code></pre>
-
-<p>于是我按照他的做法，把ASIHTTPRequest里的<code>ASIInputStream</code>全部替换成了<code>NSInputStream</code>，再用Leaks Profile的时候泄漏果真消失了。也正如这位仁兄所说的，<code>ASIInputStream</code>只是把自己伪装成一个<code>NSInputStream</code>，并且实现了一些<code>NSInputStream</code>的接口，实际都是由其中包含的<code>NSInputStream</code>实例完成的。<code>ASIInputStream</code>这个类的功能主要是用来做流量限制，如果不需要这个功能的话，直接把<code>ASIInputStream</code>替换成<code>NSInputStream</code>即可解决问题。</p>
-
-<p>那么如果我把<code>ASIInputStream</code>继承自<code>NSInputStream</code>的话是不是就能既保留流量限制功能又解决泄漏问题了呢？于是我开始尝试继承<code>NSInputStream</code>，其中碰到了一些困难。NSInputStream的init方法都是写在一个Category里的，无法被继承- -！。</p>
-
-<p>```objective-c
-@interface NSInputStream (NSInputStreamExtensions)
-&ndash; (id)initWithData:(NSData <em>)data;
-&ndash; (id)initWithFileAtPath:(NSString </em>)path;
-&ndash; (id)initWithURL:(NSURL *)url NS_AVAILABLE(10_6, 4_0);</p>
-
-<ul>
-<li>(id)inputStreamWithData:(NSData *)data;</li>
-<li>(id)inputStreamWithFileAtPath:(NSString *)path;</li>
-<li>(id)inputStreamWithURL:(NSURL *)url NS_AVAILABLE(10_6, 4_0);
-@end
-```</li>
-</ul>
-
-
-<p>经过一番google我在git上发现了一个repo：<a href="https://github.com/bjhomer/HSCountingInputStream">https://github.com/bjhomer/HSCountingInputStream</a></p>
-
-<p>这个repo中实现了对于<code>NSInputStream</code>的继承。仔细阅读完成后发现其实所谓的继承也只不过时在类的@interface中声明了一下继承自<code>NSInputStream</code>而已，实际的工作还是由类中的一个<code>NSInputStream</code>实例完成的，但相比于<code>ASIInputStream</code>这个repo里的实现多了几个方法：</p>
-
-<p>```objective-c
-//私有的CFRunLoopRef schedule、unschedule方法
-&ndash; (void)<em>scheduleInCFRunLoop:(CFRunLoopRef)aRunLoop forMode:(CFStringRef)aMode;
-&ndash; (BOOL)</em>setCFClientFlags:(CFOptionFlags)inFlags</p>
-
-<pre><code>             callback:(CFReadStreamClientCallBack)inCallback
-              context:(CFStreamClientContext *)inContext;
-</code></pre>
-
-<ul>
-<li>(void)_unscheduleFromCFRunLoop:(CFRunLoopRef)aRunLoop forMode:(CFStringRef)aMode;</li>
-</ul>
-
-
-<p>//NSInputStream的代理方法
-&ndash; (void)stream:(NSStream *)aStream handleEvent:(NSStreamEvent)eventCode;
-```</p>
-
-<p>这些方法的作用大家可以参考链接：<a href="http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/">http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/</a>。</p>
-
-<p>简单的说就是<code>NSInputStream</code>需要同时支持<code>NSRunLoop</code>和<code>CFRunLoopRef</code>的schedule和unschedule方法，那几个私有方法就是负责<code>CFRunLoopRef</code>的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的<code>release</code>方法，iOS6下它的堆栈中正好有<code>CFRunLoopRef</code>的一些方法。莫非这就是<code>ASIInputStream</code>内存泄漏的原因所在？</p>
-
-<p>我当时的猜测是，iOS7下的内存泄漏是<code>ASIInputStream</code>伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但<code>ASIInputStream</code>的功能依然存在，HTTP请求并未因此失效，这说明<code>ASIInputStream</code>还是被bridge成了<code>CFReadStream</code>，但只是因为少了和<code>NSInputStream</code>一样的unschedule方法导致其没有被正常unschedule。如果我把<code>ASIInputStream</code>的unschedule方法补上是否就可以解决问题？</p>
-
-<p>我把上述的几个方法在<code>ASIInputStream</code>中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在<code>ASIInputStream</code>的<code>release</code>方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把"_&ldquo;去掉了）。</p>
-
-<p>```objective-c
-+ (BOOL) resolveInstanceMethod:(SEL) selector
-{</p>
-
-<pre><code>NSString * name = NSStringFromSelector(selector);
-
-if ( [name hasPrefix:@"_"] )
-{
-    name = [name substringFromIndex:1];
-    SEL aSelector = NSSelectorFromString(name);
-    Method method = class_getInstanceMethod(self, aSelector);
-
-    if ( method )
-    {
-        class_addMethod(self,
-                        selector,
-                        method_getImplementation(method),
-                        method_getTypeEncoding(method));
-        return YES;
-    }
-}
-return [super resolveInstanceMethod:selector];
-</code></pre>
-
-<p>}
-```</p>
-
-<p>至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请告知。。感激不尽 ~_~。</p>
-
-<p>附上修改过后的<code>ASIInputStream</code><a href="https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330">代码</a></p>
-
-<hr />
-
-<h1>后记</h1>
-
-<p>问题没解决的时候其他同事建议我更换成AFNetworking等等其他开源库，因为这些库更新快文档全，ASIHTTPRequest接口复杂、代码繁多而且如今已年久失修无人维护了。确实如此，但由于一些项目上的原因我们无法更换，况且ASIHTTRequest在效率上略好，并且拥有其他基于NSURLConnection的库不具备一些功能。在解决问题的过程中也让我对NSInputStream的工作机制有了更深的理解，可谓一石二鸟。由于鄙人能力有限，其中一些地方可能说的有错误或者有纰漏的话还请大神们指正:)</p>
 ]]></content>
   </entry>
   

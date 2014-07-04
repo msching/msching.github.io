@@ -7,7 +7,7 @@
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="Jun 26th, 2014 Audio, iOS iOS8beta1下WebCore可能会打断音频播放 问题 前不久在QA发现一个问题，在iOS8 beta1上使用我们的app播放歌曲时进入某些内嵌的web页面（UIWebview实现）时歌曲会暂停播放，但是界面仍然显示为正在播放状态。 &hellip;">
+	<meta name="description" content="Jul 4th, 2014 iOS 奇怪的Graphics消耗（iOS 7.1.x） 近期有部分用户反馈我们的app在使用时有发热现象，在排查原因的过程中发现了一个奇怪的问题。在某个页面推出时Instruments的Core Animation会有帧数显示，数值在59~60， &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,49 @@
 			<div class="mid-col-container">
 				<div id="content" class="inner">
 <div itemscope itemtype="http://schema.org/Blog">
+
+
+    <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-07-04T14:25:31+08:00" data-updated="true" itemprop="datePublished">Jul 4<span>th</span>, 2014</time></div>
+		<div class="tags">
+
+
+	<a class='category' href='/blog/categories/ios/'>iOS</a>
+
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name"><a href="/blog/2014/07/04/strange-high-graphics-cost-in-ios-7-dot-1-x/" itemprop="url">奇怪的Graphics消耗（iOS 7.1.x）</a></h1>
+	<div class="entry-content" itemprop="articleBody">
+		<p>近期有部分用户反馈我们的app在使用时有发热现象，在排查原因的过程中发现了一个奇怪的问题。在某个页面推出时<code>Instruments</code>的<code>Core Animation</code>会有帧数显示，数值在59~60，而此时并没有任何需要消耗Graphics的代码在跑，所有UI都是静止的。这个现象只会在iOS 7.1.x上出现，其他系统包括最新发布的iOS8 beta上均没有出现类似问题。</p>
+
+<p>造成这个现象的页面比较特殊，其展现形式看上去虽然是一个UIViewController把一个UINavigationController用ModalView的形式push出来了，但实际上是把UINavigationController的.view直接add在了UIViewController的.view上，并用一个UIView动画展示页面。</p>
+
+<p>为了弄清楚到底为什么会在UI静止的情况下产生Graphics消耗，我新建了一个空工程用相同的方法实现了一个推出页面的动画，然后profile却没有发现有问题。再次回头看app发现这个推出页面的controller是个UITabBarController，于是为测试工程加上tabBarController后再次profile，问题重现了，Core Animation在页面出现之后显示了帧数，页面隐藏之后帧数显示就消失了，从而可以推断是UITabBarController上的某个UI元素导致了这个问题。</p>
+
+<p>接下来的步骤就是遍历UITabBarController的view上所有的subview并逐个隐藏来进行测试，幸运的是第一个就蒙对了，在我隐藏了UITabBarController的tabbar以后奇怪的帧数就不再出现了。这个现象很快让我想到了iOS 7以后苹果加入的模糊效果，这个效果在UINavigationBar、UITabBar、UIToolBar等UI控件上都有使用，下面把UITabBarController去掉，在view上直接add一个UIToolBar，发现问题同样会出现。至此基本确定是由于这个模糊效果造成的，至于为什么只会在7.1.x上出现这个问题。。可能只有苹果才知道了=。=。</p>
+
+<p>测试程序代码点<a href="https://github.com/msching/TestGPU">这里</a></p>
+
+		
+		
+	</div>
+
+</article>
 
 
     <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
