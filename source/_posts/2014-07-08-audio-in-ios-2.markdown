@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "iOS音频播放 (二)：AudioSession"
-subtitle: "Audio in iOS (Part 1) : AudioSession"
+subtitle: "Audio in iOS (Part 2) : AudioSession"
 date: 2014-07-08 13:58:27 +0800
 comments: true
 statement: true
