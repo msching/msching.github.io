@@ -4,7 +4,7 @@
   <title><![CDATA[码农人生]]></title>
   <link href="http://msching.github.io/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-07-08T13:55:39+08:00</updated>
+  <updated>2014-07-08T17:52:03+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,606 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[iOS音频播放 (二)：AudioSession]]></title>
+    <link href="http://msching.github.io/blog/2014/07/08/audio-in-ios-2/"/>
+    <updated>2014-07-08T13:58:27+08:00</updated>
+    <id>http://msching.github.io/blog/2014/07/08/audio-in-ios-2</id>
+    <content type="html"><![CDATA[<h1>前言</h1>
+
+<p>本篇为《iOS音频播放》系列的第二篇。</p>
+
+<p>在实施<a href="blog/2014/07/07/audio-in-ios/">前一篇</a>中所述的7个步骤步之前还必须面对一个麻烦的问题，AudioSession。</p>
+
+<hr />
+
+<h1>AudioSession简介</h1>
+
+<p>AudioSession这个玩意的主要功能包括以下几点（图片来自<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40007875">官方文档</a>）：</p>
+
+<ol>
+<li>确定你的app如何使用音频（是播放？还是录音？）</li>
+<li>为你的app选择合适的输入输出设备（比如输入用的麦克风，输出是耳机、手机功放或者airplay）</li>
+<li>协调你的app的音频播放和系统以及其他app行为（例如有电话时需要打断，电话结束时需要恢复，按下静音按钮时是否歌曲也要静音等）</li>
+</ol>
+
+
+<p><img src="http://msching.github.io/images/iOS-audio/audiosession.jpg" alt="AudioSession" /></p>
+
+<p>AudioSession相关的类有两个：</p>
+
+<ol>
+<li><code>AudioToolBox</code>中的<code>AudioSession</code></li>
+<li><code>AVFoundation</code>中的<code>AVAudioSession</code></li>
+</ol>
+
+
+<p>其中AudioSession在SDK 7中已经被标注为depracated，而AVAudioSession这个类虽然iOS 3开始就已经存在了，但其中很多方法和变量都是在iOS 6以后甚至是iOS 7才有的。所以各位可以依照以下标准选择：</p>
+
+<ul>
+<li>如果最低版本支持iOS 5，请使用<code>AudioSession</code></li>
+<li>如果最低版本支持iOS 6及以上，可以考虑使用<code>AVAudioSession</code></li>
+<li>如果最低版本支持iOS 7及以上，请使用<code>AVAudioSession</code></li>
+</ul>
+
+
+<p>下面以<code>AudioSession</code>类为例来讲述AudioSession相关功能的使用（很不幸我需要支持iOS 5。。T-T，使用<code>AVAudioSession</code>的同学可以在其头文件中寻找对应的方法使用即可，需要注意的点我会加以说明）.</p>
+
+<p><strong>注意：在使用AVAudioPlayer/AVPlayer时可以不用关心AudioSession的相关问题，Apple已经把AudioSession的处理过程封装了，但音乐打断后的响应还是要做的（比如打断后音乐暂停了UI状态也要变化，这个应该通过KVO就可以搞定了吧。。我没试过瞎猜的>_&lt;）。</strong></p>
+
+<hr />
+
+<h1>初始化AudioSession</h1>
+
+<p>使用<code>AudioSession</code>类首先需要调用初始化方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">extern</span> <span class="n">OSStatus</span> <span class="nf">AudioSessionInitialize</span><span class="p">(</span><span class="n">CFRunLoopRef</span> <span class="n">inRunLoop</span><span class="p">,</span>
+</span><span class='line'>                                       <span class="n">CFStringRef</span> <span class="n">inRunLoopMode</span><span class="p">,</span>
+</span><span class='line'>                                       <span class="n">AudioSessionInterruptionListener</span> <span class="n">inInterruptionListener</span><span class="p">,</span>
+</span><span class='line'>                                       <span class="kt">void</span> <span class="o">*</span><span class="n">inClientData</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>前两个参数一般填<code>NULL</code>表示AudioSession运行在主线程上（但并不代表音频的相关处理运行在主线程上，只是AudioSession），第三个参数需要传入一个一个<code>AudioSessionInterruptionListener</code>类型的方法，作为AudioSession被打断时的回调，第四个参数则是代表打断回调时需要附带的对象（即回到方法中的inClientData，如下所示，可以理解为UIView animation中的context）。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">typedef</span> <span class="nf">void</span> <span class="p">(</span><span class="o">*</span><span class="n">AudioSessionInterruptionListener</span><span class="p">)(</span><span class="kt">void</span> <span class="o">*</span> <span class="n">inClientData</span><span class="p">,</span> <span class="n">UInt32</span> <span class="n">inInterruptionState</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这才刚开始，坑就来了。这里会有两个问题：</p>
+
+<p>第一，AudioSessionInitialize方法只能被有效运行一次，也就是说<code>AudioSessionInterruptionListener</code>只能被设置一次，这就意味着这个打断回调方法是一个静态方法，一旦初始化成功以后所有的打断都会回调到这个方法，即便下一次再次调用AudioSessionInitialize并且把另一个静态方法作为参数传入，当打断到来时还是会回调到第一次设置的方法上。</p>
+
+<p>这种场景并不少见，例如你的app既需要播放歌曲又需要录音，当然你不可能知道用户会先调用哪个功能，所以你必须在播放和录音的模块中都调用AudioSessionInitialize注册打断方法，但最终打断回调只会作用在先注册的那个模块中，很蛋疼吧。。。所以对于AudioSession的使用最好的方法是生成一个类单独进行管理，统一接收打断回调并发送自定义的打断通知，在需要用到AudioSession的模块中接收通知并做相应的操作。</p>
+
+<p>Apple也察觉到了这一点，所以在AVAudioSession中首先取消了Initialize方法，改为了单例方法<code>sharedInstance</code>。在iOS 6上所有的打断都需要通过设置<code>id&lt;AVAudioSessionDelegate&gt; delegate</code>并实现回调方法来实现，这同样会有上述的问题，所以在iOS6下仍然需要一个单独管理AudioSession的类存在。在iOS 7以后Apple终于把打断改成了通知的形式。。这下科学了。</p>
+
+<p>第二，AudioSessionInitialize方法的第四个参数inClientData，也就是回调方法的第一个参数。上面已经说了打断回调是一个静态方法，而这个参数的目的是为了能让回调时拿到context（上下文信息），所以这个inClientData需要是一个有足够长生命周期的对象（当然前提是你确实需要用到这个参数），如果这个对象被dealloc了，那么回调时拿到的inClientData会是一个野指针。就这一点来说构造一个单独管理AudioSession的类也是有必要的，因为这个类的生命周期和AudioSession一样长，我们可以把context保存在这个类中。</p>
+
+<hr />
+
+<h1>监听RouteChange事件</h1>
+
+<p>如果想要实现类似于“拔掉耳机就把歌曲暂停”的功能就需要监听RouteChange事件：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">extern</span> <span class="n">OSStatus</span> <span class="nf">AudioSessionAddPropertyListener</span><span class="p">(</span><span class="n">AudioSessionPropertyID</span> <span class="n">inID</span><span class="p">,</span>
+</span><span class='line'>                                                <span class="n">AudioSessionPropertyListener</span> <span class="n">inProc</span><span class="p">,</span>
+</span><span class='line'>                                                <span class="kt">void</span> <span class="o">*</span><span class="n">inClientData</span><span class="p">);</span>
+</span><span class='line'>                                              
+</span><span class='line'><span class="k">typedef</span> <span class="nf">void</span> <span class="p">(</span><span class="o">*</span><span class="n">AudioSessionPropertyListener</span><span class="p">)(</span><span class="kt">void</span> <span class="o">*</span> <span class="n">inClientData</span><span class="p">,</span>
+</span><span class='line'>                                             <span class="n">AudioSessionPropertyID</span> <span class="n">inID</span><span class="p">,</span>
+</span><span class='line'>                                             <span class="n">UInt32</span> <span class="n">inDataSize</span><span class="p">,</span>
+</span><span class='line'>                                             <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span> <span class="n">inData</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>调用上述方法，AudioSessionPropertyID参数传<code>kAudioSessionProperty_AudioRouteChange</code>，AudioSessionPropertyListener参数传对应的回调方法。inClientData参数同AudioSessionInitialize方法。</p>
+
+<p>同样作为静态回调方法还是需要统一管理，接到回调时可以把第一个参数inData转换成<code>CFDictionaryRef</code>并从中获取kAudioSession_AudioRouteChangeKey_Reason键值对应的value（应该是一个CFNumberRef），得到这些信息后就可以发送自定义通知给其他模块进行相应操作(例如<code>kAudioSessionRouteChangeReason_OldDeviceUnavailable</code>就可以用来做“拔掉耳机就把歌曲暂停”)。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//AudioSession的AudioRouteChangeReason枚举</span>
+</span><span class='line'><span class="k">enum</span> <span class="p">{</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_Unknown</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_NewDeviceAvailable</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_OldDeviceUnavailable</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_CategoryChange</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_Override</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_WakeFromSleep</span> <span class="o">=</span> <span class="mi">6</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_NoSuitableRouteForCategory</span> <span class="o">=</span> <span class="mi">7</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionRouteChangeReason_RouteConfigurationChange</span> <span class="o">=</span> <span class="mi">8</span>
+</span><span class='line'>  <span class="p">};</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//AVAudioSession的AudioRouteChangeReason枚举</span>
+</span><span class='line'><span class="k">typedef</span> <span class="nf">NS_ENUM</span><span class="p">(</span><span class="n">NSUInteger</span><span class="p">,</span> <span class="n">AVAudioSessionRouteChangeReason</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonUnknown</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonNewDeviceAvailable</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonOldDeviceUnavailable</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonCategoryChange</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonOverride</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonWakeFromSleep</span> <span class="o">=</span> <span class="mi">6</span><span class="p">,</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonNoSuitableRouteForCategory</span> <span class="o">=</span> <span class="mi">7</span><span class="p">,</span>
+</span><span class='line'>  <span class="n">AVAudioSessionRouteChangeReasonRouteConfigurationChange</span> <span class="n">NS_ENUM_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">7</span><span class="n">_0</span><span class="p">)</span> <span class="o">=</span> <span class="mi">8</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><strong>注意：iOS 6下如果使用了<code>AVAudioSession</code>由于<code>AVAudioSessionDelegate</code>中并没有定义相关的方法，还是需要用这个方法来实现监听。iOS 7下直接监听AVAudioSession的通知就可以了。</strong></p>
+
+<hr />
+
+<p>这里附带两个方法的实现，都是基于<code>AudioSession</code>类的（使用<code>AVAudioSession</code>的同学帮不到你们啦）。</p>
+
+<p>1、判断是否插了耳机：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">+</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">usingHeadset</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'><span class="cp">#if TARGET_IPHONE_SIMULATOR</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'><span class="cp">#endif</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">CFStringRef</span> <span class="n">route</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">UInt32</span> <span class="n">propertySize</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">CFStringRef</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">AudioSessionGetProperty</span><span class="p">(</span><span class="n">kAudioSessionProperty_AudioRoute</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">propertySize</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">route</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="kt">BOOL</span> <span class="n">hasHeadset</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">if</span><span class="p">((</span><span class="n">route</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="o">||</span> <span class="p">(</span><span class="n">CFStringGetLength</span><span class="p">(</span><span class="n">route</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="c1">// Silent Mode</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="cm">/* Known values of route:</span>
+</span><span class='line'><span class="cm">         * &quot;Headset&quot;</span>
+</span><span class='line'><span class="cm">         * &quot;Headphone&quot;</span>
+</span><span class='line'><span class="cm">         * &quot;Speaker&quot;</span>
+</span><span class='line'><span class="cm">         * &quot;SpeakerAndMicrophone&quot;</span>
+</span><span class='line'><span class="cm">         * &quot;HeadphonesAndMicrophone&quot;</span>
+</span><span class='line'><span class="cm">         * &quot;HeadsetInOut&quot;</span>
+</span><span class='line'><span class="cm">         * &quot;ReceiverAndMicrophone&quot;</span>
+</span><span class='line'><span class="cm">         * &quot;Lineout&quot;</span>
+</span><span class='line'><span class="cm">         */</span>
+</span><span class='line'>        <span class="n">NSString</span><span class="o">*</span> <span class="n">routeStr</span> <span class="o">=</span> <span class="p">(</span><span class="n">__bridge</span> <span class="n">NSString</span><span class="o">*</span><span class="p">)</span><span class="n">route</span><span class="p">;</span>
+</span><span class='line'>        <span class="n">NSRange</span> <span class="n">headphoneRange</span> <span class="o">=</span> <span class="p">[</span><span class="n">routeStr</span> <span class="n">rangeOfString</span> <span class="o">:</span> <span class="s">@&quot;Headphone&quot;</span><span class="p">];</span>
+</span><span class='line'>        <span class="n">NSRange</span> <span class="n">headsetRange</span> <span class="o">=</span> <span class="p">[</span><span class="n">routeStr</span> <span class="n">rangeOfString</span> <span class="o">:</span> <span class="s">@&quot;Headset&quot;</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span><span class="n">headphoneRange</span><span class="p">.</span><span class="n">location</span> <span class="o">!=</span> <span class="n">NSNotFound</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">hasHeadset</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>        <span class="k">else</span> <span class="k">if</span><span class="p">(</span><span class="n">headsetRange</span><span class="p">.</span><span class="n">location</span> <span class="o">!=</span> <span class="n">NSNotFound</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">hasHeadset</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">route</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">CFRelease</span><span class="p">(</span><span class="n">route</span><span class="p">);</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">return</span> <span class="n">hasHeadset</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>2、判断是否开了Airplay(来自<a href="http://stackoverflow.com/questions/13044894/get-name-of-airplay-device-using-avplayer">StackOverflow</a>)：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">+</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">isAirplayActived</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">CFDictionaryRef</span> <span class="n">currentRouteDescriptionDictionary</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">UInt32</span> <span class="n">dataSize</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">currentRouteDescriptionDictionary</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">AudioSessionGetProperty</span><span class="p">(</span><span class="n">kAudioSessionProperty_AudioRouteDescription</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">dataSize</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">currentRouteDescriptionDictionary</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="kt">BOOL</span> <span class="n">airplayActived</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">currentRouteDescriptionDictionary</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">CFArrayRef</span> <span class="n">outputs</span> <span class="o">=</span> <span class="n">CFDictionaryGetValue</span><span class="p">(</span><span class="n">currentRouteDescriptionDictionary</span><span class="p">,</span> <span class="n">kAudioSession_AudioRouteKey_Outputs</span><span class="p">);</span>
+</span><span class='line'>        <span class="k">if</span><span class="p">(</span><span class="n">outputs</span> <span class="o">!=</span> <span class="nb">NULL</span> <span class="o">&amp;&amp;</span> <span class="n">CFArrayGetCount</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">CFDictionaryRef</span> <span class="n">currentOutput</span> <span class="o">=</span> <span class="n">CFArrayGetValueAtIndex</span><span class="p">(</span><span class="n">outputs</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+</span><span class='line'>            <span class="c1">//Get the output type (will show airplay / hdmi etc</span>
+</span><span class='line'>            <span class="n">CFStringRef</span> <span class="n">outputType</span> <span class="o">=</span> <span class="n">CFDictionaryGetValue</span><span class="p">(</span><span class="n">currentOutput</span><span class="p">,</span> <span class="n">kAudioSession_AudioRouteKey_Type</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>            <span class="n">airplayActived</span> <span class="o">=</span> <span class="p">(</span><span class="n">CFStringCompare</span><span class="p">(</span><span class="n">outputType</span><span class="p">,</span> <span class="n">kAudioSessionOutputRoute_AirPlay</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="n">kCFCompareEqualTo</span><span class="p">);</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>        <span class="n">CFRelease</span><span class="p">(</span><span class="n">currentRouteDescriptionDictionary</span><span class="p">);</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">airplayActived</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>设置类别</h1>
+
+<p>下一步要设置AudioSession的Category，使用<code>AudioSession</code>时调用下面的接口</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">extern</span> <span class="n">OSStatus</span> <span class="nf">AudioSessionSetProperty</span><span class="p">(</span><span class="n">AudioSessionPropertyID</span> <span class="n">inID</span><span class="p">,</span>
+</span><span class='line'>                                        <span class="n">UInt32</span> <span class="n">inDataSize</span><span class="p">,</span>
+</span><span class='line'>                                        <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">inData</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>如果我需要的功能是播放，执行如下代码</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">UInt32</span> <span class="n">sessionCategory</span> <span class="o">=</span> <span class="n">kAudioSessionCategory_MediaPlayback</span><span class="p">;</span>
+</span><span class='line'><span class="n">AudioSessionSetProperty</span> <span class="p">(</span><span class="n">kAudioSessionProperty_AudioCategory</span><span class="p">,</span>
+</span><span class='line'>                         <span class="k">sizeof</span><span class="p">(</span><span class="n">sessionCategory</span><span class="p">),</span>
+</span><span class='line'>                         <span class="o">&amp;</span><span class="n">sessionCategory</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>使用<code>AVAudioSession</code>时调用下面的接口</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cm">/* set session category */</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">setCategory:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">category</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span><span class="p">;</span>
+</span><span class='line'><span class="cm">/* set session category with options */</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">setCategory:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">category</span> <span class="nf">withOptions:</span> <span class="p">(</span><span class="n">AVAudioSessionCategoryOptions</span><span class="p">)</span><span class="nv">options</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">6</span><span class="n">_0</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>至于Category的类型在<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/AudioSessionBasics/AudioSessionBasics.html#//apple_ref/doc/uid/TP40007875-CH3-SW1">官方文档</a>中都有介绍，我这里也只罗列一下具体就不赘述了，各位在使用时可以依照自己需要的功能设置Category。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//AudioSession的AudioSessionCategory枚举</span>
+</span><span class='line'><span class="k">enum</span> <span class="p">{</span>
+</span><span class='line'>      <span class="n">kAudioSessionCategory_AmbientSound</span>               <span class="o">=</span> <span class="err">&#39;</span><span class="n">ambi</span><span class="err">&#39;</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionCategory_SoloAmbientSound</span>           <span class="o">=</span> <span class="err">&#39;</span><span class="n">solo</span><span class="err">&#39;</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionCategory_MediaPlayback</span>              <span class="o">=</span> <span class="err">&#39;</span><span class="n">medi</span><span class="err">&#39;</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionCategory_RecordAudio</span>                <span class="o">=</span> <span class="err">&#39;</span><span class="n">reca</span><span class="err">&#39;</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionCategory_PlayAndRecord</span>              <span class="o">=</span> <span class="err">&#39;</span><span class="n">plar</span><span class="err">&#39;</span><span class="p">,</span>
+</span><span class='line'>      <span class="n">kAudioSessionCategory_AudioProcessing</span>            <span class="o">=</span> <span class="err">&#39;</span><span class="n">proc</span><span class="err">&#39;</span>
+</span><span class='line'>  <span class="p">};</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//AudioSession的AudioSessionCategory字符串</span>
+</span><span class='line'><span class="cm">/*  Use this category for background sounds such as rain, car engine noise, etc.  </span>
+</span><span class='line'><span class="cm"> Mixes with other music. */</span>
+</span><span class='line'><span class="n">AVF_EXPORT</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">AVAudioSessionCategoryAmbient</span><span class="p">;</span>
+</span><span class='line'>  
+</span><span class='line'><span class="cm">/*  Use this category for background sounds.  Other music will stop playing. */</span>
+</span><span class='line'><span class="n">AVF_EXPORT</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">AVAudioSessionCategorySoloAmbient</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/* Use this category for music tracks.*/</span>
+</span><span class='line'><span class="n">AVF_EXPORT</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">AVAudioSessionCategoryPlayback</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/*  Use this category when recording audio. */</span>
+</span><span class='line'><span class="n">AVF_EXPORT</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">AVAudioSessionCategoryRecord</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/*  Use this category when recording and playing back audio. */</span>
+</span><span class='line'><span class="n">AVF_EXPORT</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">AVAudioSessionCategoryPlayAndRecord</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="cm">/*  Use this category when using a hardware codec or signal processor while</span>
+</span><span class='line'><span class="cm"> not playing or recording audio. */</span>
+</span><span class='line'><span class="n">AVF_EXPORT</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">AVAudioSessionCategoryAudioProcessing</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>启用</h1>
+
+<p>有了Category就可以启动AudioSession了，启动方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//AudioSession的启动方法</span>
+</span><span class='line'><span class="k">extern</span> <span class="n">OSStatus</span> <span class="nf">AudioSessionSetActive</span><span class="p">(</span><span class="n">Boolean</span> <span class="n">active</span><span class="p">);</span>
+</span><span class='line'><span class="k">extern</span> <span class="n">OSStatus</span> <span class="nf">AudioSessionSetActiveWithFlags</span><span class="p">(</span><span class="n">Boolean</span> <span class="n">active</span><span class="p">,</span> <span class="n">UInt32</span> <span class="n">inFlags</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//AVAudioSession的启动方法</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">setActive:</span><span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nv">active</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">setActive:</span><span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nv">active</span> <span class="nf">withOptions:</span><span class="p">(</span><span class="n">AVAudioSessionSetActiveOptions</span><span class="p">)</span><span class="nv">options</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">6</span><span class="n">_0</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>启动方法调用后必须要判断是否启动成功，启动不成功的情况经常存在，例如一个前台的app正在播放，你的app正在后台想要启动AudioSession那就会返回失败。</p>
+
+<p>一般情况下我们在启动和停止AudioSession调用第一个方法就可以了。但如果你正在做一个即时语音通讯app的话（类似于微信、易信）就需要注意在deactive AudioSession的时候需要使用第二个方法，inFlags参数传入<code>kAudioSessionSetActiveFlag_NotifyOthersOnDeactivation</code>（<code>AVAudioSession</code>给options参数传入<code>AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation</code>）。当你的app deactive自己的AudioSession时系统会通知上一个被打断播放app打断结束（就是上面说到的打断回调），如果你的app在deactive时传入了NotifyOthersOnDeactivation参数，那么其他app在接到打断结束回调时会多得到一个参数<code>kAudioSessionInterruptionType_ShouldResume</code>否则就是ShouldNotResume（<code>AVAudioSessionInterruptionOptionShouldResume</code>），根据参数的值可以决定是否继续播放。</p>
+
+<p>大概流程是这样的：</p>
+
+<ol>
+<li>一个音乐软件A正在播放；</li>
+<li>用户打开你的软件播放对话语音，AudioSession active；</li>
+<li>音乐软件A音乐被打断并收到InterruptBegin事件；</li>
+<li>对话语音播放结束，AudioSession deactive并且传入NotifyOthersOnDeactivation参数；</li>
+<li>音乐软件A收到InterruptEnd事件，查看Resume参数，如果是ShouldResume控制音频继续播放，如果是ShouldNotResume就维持打断状态；</li>
+</ol>
+
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/ConfiguringanAudioSession/ConfiguringanAudioSession.html#//apple_ref/doc/uid/TP40007875-CH2-SW1">官方文档</a>中有一张很形象的图来阐述这个现象：</p>
+
+<p><img src="http://msching.github.io/images/iOS-audio/audiosession-active.jpg" alt="" /></p>
+
+<p>然而现在某些语音通讯软件和某些音乐软件却无视了<code>NotifyOthersOnDeactivation</code>和<code>ShouldResume</code>的正确用法，导致我们经常接到这样的用户反馈：</p>
+
+<pre><code>你们的app在使用xx语音软件听了一段话后就不会继续播放了，但xx音乐软件可以继续播放啊。
+</code></pre>
+
+<p>好吧，上面只是吐槽一下。请无视我吧。</p>
+
+<hr />
+
+<h1>打断处理</h1>
+
+<p>正常启动AudioSession之后就可以播放音频了，下面要讲的是对于打断的处理。之前我们说到打断的回调在iOS5、6下需要统一管理，在收到打断开始和结束时需要发送自定义的通知。</p>
+
+<p>使用<code>AudioSession</code>时打断回调应该首先获取<code>kAudioSessionProperty_InterruptionType</code>，然后发送一个自定义的通知并带上对应的参数。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">static</span> <span class="kt">void</span> <span class="nf">MyAudioSessionInterruptionListener</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">inClientData</span><span class="p">,</span> <span class="n">UInt32</span> <span class="n">inInterruptionState</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">AudioSessionInterruptionType</span> <span class="n">interruptionType</span> <span class="o">=</span> <span class="n">kAudioSessionInterruptionType_ShouldNotResume</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">UInt32</span> <span class="n">interruptionTypeSize</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">interruptionType</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">AudioSessionGetProperty</span><span class="p">(</span><span class="n">kAudioSessionProperty_InterruptionType</span><span class="p">,</span>
+</span><span class='line'>                            <span class="o">&amp;</span><span class="n">interruptionTypeSize</span><span class="p">,</span>
+</span><span class='line'>                            <span class="o">&amp;</span><span class="n">interruptionType</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">NSDictionary</span> <span class="o">*</span><span class="n">userInfo</span> <span class="o">=</span> <span class="err">@</span><span class="p">{</span><span class="nl">MyAudioInterruptionStateKey:</span><span class="err">@</span><span class="p">(</span><span class="n">inInterruptionState</span><span class="p">),</span>
+</span><span class='line'>                               <span class="nl">MyAudioInterruptionTypeKey:</span><span class="err">@</span><span class="p">(</span><span class="n">interruptionType</span><span class="p">)};</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="p">[[</span><span class="n">NSNotificationCenter</span> <span class="n">defaultCenter</span><span class="p">]</span> <span class="nl">postNotificationName:</span><span class="n">MyAudioInterruptionNotification</span> <span class="nl">object:</span><span class="nb">nil</span> <span class="nl">userInfo:</span><span class="n">userInfo</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>收到通知后的处理方法如下（注意ShouldResume参数）：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">interruptionNotificationReceived:</span><span class="p">(</span><span class="n">NSNotification</span> <span class="o">*</span><span class="p">)</span><span class="nv">notification</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">UInt32</span> <span class="n">interruptionState</span> <span class="o">=</span> <span class="p">[</span><span class="n">notification</span><span class="p">.</span><span class="n">userInfo</span><span class="p">[</span><span class="n">MyAudioInterruptionStateKey</span><span class="p">]</span> <span class="n">unsignedIntValue</span><span class="p">];</span>
+</span><span class='line'>    <span class="n">AudioSessionInterruptionType</span> <span class="n">interruptionType</span> <span class="o">=</span> <span class="p">[</span><span class="n">notification</span><span class="p">.</span><span class="n">userInfo</span><span class="p">[</span><span class="n">MyAudioInterruptionTypeKey</span><span class="p">]</span> <span class="n">unsignedIntValue</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">self</span> <span class="nl">handleAudioSessionInterruptionWithState:</span><span class="n">interruptionState</span> <span class="nl">type:</span><span class="n">interruptionType</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">handleAudioSessionInterruptionWithState:</span><span class="p">(</span><span class="n">UInt32</span><span class="p">)</span><span class="nv">interruptionState</span> <span class="nf">type:</span><span class="p">(</span><span class="n">AudioSessionInterruptionType</span><span class="p">)</span><span class="nv">interruptionType</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">interruptionState</span> <span class="o">==</span> <span class="n">kAudioSessionBeginInterruption</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="c1">//控制UI，暂停播放</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">interruptionState</span> <span class="o">==</span> <span class="n">kAudioSessionEndInterruption</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span><span class="n">interruptionType</span> <span class="o">==</span> <span class="n">kAudioSessionInterruptionType_ShouldResume</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">OSStatus</span> <span class="n">status</span> <span class="o">=</span> <span class="n">AudioSessionSetActive</span><span class="p">(</span><span class="n">true</span><span class="p">);</span>
+</span><span class='line'>            <span class="k">if</span> <span class="p">(</span><span class="n">status</span> <span class="o">==</span> <span class="n">noErr</span><span class="p">)</span>
+</span><span class='line'>            <span class="p">{</span>
+</span><span class='line'>                <span class="c1">//控制UI，继续播放</span>
+</span><span class='line'>            <span class="p">}</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>小结</h1>
+
+<p>关于AudioSession的话题到此结束（码字果然很累。。）。小结一下：</p>
+
+<ul>
+<li>如果最低版本支持iOS 5，请使用<code>AudioSession</code>，需要有一个类统一管理AudioSession的所有回调，在接到回调后发送对应的自定义通知；</li>
+<li>如果最低版本支持iOS 6及以上，可以考虑使用<code>AVAudioSession</code>，仍然需要统一管理AudioSession的回调，其中打断回调可以使用<code>AVAudioSessionDelegate</code>的方法进行监听；</li>
+<li>如果最低版本支持iOS 7及以上，请使用<code>AVAudioSession</code>，不用统一管理，接AVAudioSession的通知即可；</li>
+<li>根据app的应用场景合理选择<code>Category</code>；</li>
+<li>在deactive时需要注意app的应用场景来合理的选择是否使用<code>NotifyOthersOnDeactivation</code>参数；</li>
+<li>在处理InterruptEnd事件时需要注意<code>ShouldResume</code>的值。</li>
+</ul>
+
+
+<hr />
+
+<h1>下篇预告</h1>
+
+<p>下一篇将讲述如何使用AudioFileStreamer分离音频帧，以及如何使用AudioQueue进行播放。</p>
+
+<hr />
+
+<h1>参考资料</h1>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40007875">AudioSession</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS音频播放 (一)：概述]]></title>
