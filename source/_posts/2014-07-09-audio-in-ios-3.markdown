@@ -434,7 +434,7 @@ UInt64 audioDataByteCount = ...; //通过kAudioFileStreamProperty_AudioDataByteC
 SInt64 dataOffset = ...; //通过kAudioFileStreamProperty_DataOffset获取的值
 double durtion = ...; //通过公式(AudioDataByteCount * 8) / BitRate计算得到的时长
 
-//近似seekOffset = 数据便宜 + seekToTime对应的近似字节数
+//近似seekOffset = 数据偏移 + seekToTime对应的近似字节数
 SInt64 approximateSeekOffset = dataOffset + (seekToTime / duration) * audioDataByteCount;
 ```
 
