@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Audio | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/audio/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-07-12T16:00:22+08:00</updated>
+  <updated>2014-07-12T16:06:56+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -499,7 +499,7 @@ UInt64 audioDataByteCount = &hellip;; //通过kAudioFileStreamProperty_AudioData
 SInt64 dataOffset = &hellip;; //通过kAudioFileStreamProperty_DataOffset获取的值
 double durtion = &hellip;; //通过公式(AudioDataByteCount * 8) / BitRate计算得到的时长</p>
 
-<p>//近似seekOffset = 数据便宜 + seekToTime对应的近似字节数
+<p>//近似seekOffset = 数据偏移 + seekToTime对应的近似字节数
 SInt64 approximateSeekOffset = dataOffset + (seekToTime / duration) * audioDataByteCount;
 ```</p>
 

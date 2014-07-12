@@ -743,7 +743,7 @@
 </span><span class='line'><span class="n">SInt64</span> <span class="n">dataOffset</span> <span class="o">=</span> <span class="p">...;</span> <span class="c1">//通过kAudioFileStreamProperty_DataOffset获取的值</span>
 </span><span class='line'><span class="kt">double</span> <span class="n">durtion</span> <span class="o">=</span> <span class="p">...;</span> <span class="c1">//通过公式(AudioDataByteCount * 8) / BitRate计算得到的时长</span>
 </span><span class='line'>
-</span><span class='line'><span class="c1">//近似seekOffset = 数据便宜 + seekToTime对应的近似字节数</span>
+</span><span class='line'><span class="c1">//近似seekOffset = 数据偏移 + seekToTime对应的近似字节数</span>
 </span><span class='line'><span class="n">SInt64</span> <span class="n">approximateSeekOffset</span> <span class="o">=</span> <span class="n">dataOffset</span> <span class="o">+</span> <span class="p">(</span><span class="n">seekToTime</span> <span class="o">/</span> <span class="n">duration</span><span class="p">)</span> <span class="o">*</span> <span class="n">audioDataByteCount</span><span class="p">;</span>
 </span></code></pre></td></tr></table></div></figure>
 
