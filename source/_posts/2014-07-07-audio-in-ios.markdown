@@ -31,7 +31,7 @@ categories: [iOS,Audio]
 
 MP3格式中的码率（BitRate）代表了MP3数据的压缩质量，现在常用的码率有128kbit/s、160kbit/s、320kbit/s等等，这个值越高声音质量也就越高。MP3编码方式常用的有两种[固定码率](http://zh.wikipedia.org/wiki/%E5%9B%BA%E5%AE%9A%E7%A0%81%E7%8E%87)(Constant bitrate，CBR)和[可变码率](http://zh.wikipedia.org/wiki/%E5%8F%AF%E5%8F%98%E7%A0%81%E7%8E%87)(Variable bitrate，VBR)。
 
-MP3格式中的数据通常由两部分组成，一部分为[ID3](http://zh.wikipedia.org/zh/ID3)用来存储歌名、演唱者、专辑、音轨数等信息，另一部分为音频数据。音频数据部分以帧(frame)为单位存储，每个音频都有自己的帧头，如图所示就是一个MP3文件帧结构图（图片同样来自互联网）。MP3中的每一个帧都有自己的帧头，其中存储了码率、采样率等解码必须的信息，所以每一个帧都可以独立于文件存在和播放，这个特性加上高压缩比使得MP3文件成为了音频流播放的主流格式。
+MP3格式中的数据通常由两部分组成，一部分为[ID3](http://zh.wikipedia.org/zh/ID3)用来存储歌名、演唱者、专辑、音轨数等信息，另一部分为音频数据。音频数据部分以帧(frame)为单位存储，每个音频都有自己的帧头，如图所示就是一个MP3文件帧结构图（图片同样来自互联网）。MP3中的每一个帧都有自己的帧头，其中存储了码率、采样率等解码必须的信息，所以每一个帧都可以独立于文件存在和播放，这个特性加上高压缩比使得MP3文件成为了音频流播放的主流格式。帧头之后存储着音频数据，这些音频数据是若干个PCM数据帧经过压缩算法压缩得到的，对CBR的MP3数据来说每个帧中包含的PCM数据帧是固定的，而VBR是可变的。
 
 ![](/images/iOS-audio/mp3frame.jpg)
 
@@ -43,7 +43,7 @@ MP3格式中的数据通常由两部分组成，一部分为[ID3](http://zh.wiki
 了解了基础概念之后我们就可以列出一个经典的音频播放流程（以MP3为例）：
 
 1. 读取MP3文件
-2. 分离MP3中的音频帧
+2. 解析采样率、码率、时长等信息，分离MP3中的音频帧
 3. 对分离出来的音频帧解码得到PCM数据
 4. 对PCM数据进行音效处理（均衡器、混响器等，非必须）
 5. 把PCM数据解码成音频信号
@@ -56,8 +56,8 @@ MP3格式中的数据通常由两部分组成，一部分为[ID3](http://zh.wiki
 
 下面对其中的中高层接口进行功能说明：
 
-* Audio File Services：读写音频数据，可以完成播放流程中的第1、2步；
-* Audio File Stream Services：对音频进行解码，可以完成播放流程中的第2部；
+* Audio File Services：读写音频数据，可以完成播放流程中的第2步；
+* Audio File Stream Services：对音频进行解码，可以完成播放流程中的第2步；
 * Audio Converter services：音频数据转换，可以完成播放流程中的第3步；
 * Audio Processing Graph Services：音效处理模块，可以完成播放流程中的第4步；
 * Audio Unit Services：播放音频数据：可以完成播放流程中的第5步、第6步；
@@ -70,9 +70,9 @@ MP3格式中的数据通常由两部分组成，一部分为[ID3](http://zh.wiki
 
 * 如果你只是想实现音频的播放，没有其他需求AVFoundation会很好的满足你的需求。它的接口使用简单、不用关心其中的细节；
 
-* 如果你的app需要对音频进行流播放并且同时存储，那么AudioFileStreamer加AudioQueue能够帮到你，你可以把音频数据下载到本地，用NSFileHandler读取本地音频文件并交给AudioFileStreamer分离音频帧，分离出来的音频帧可以送给AudioQueue进行解码和播放。如果是本地文件也可以直接用AudioFile读取文件并分离帧。（这两个都是比较直接的做法，这类需求也可以用AVFoundation+本地server的方式实现，AVAudioPlayer会把请求发送给本地server，由本地server转发出去，获取数据后在本地server中存储并转送给AVAudioPlayer。另一个比较trick的做法是先把音频下载到文件中，在下载到一定量的数据后把文件路径给AVAudioPlayer播放，当然这种做法在音频seek后就回有问题了。）；
+* 如果你的app需要对音频进行流播放并且同时存储，那么AudioFileStreamer加AudioQueue能够帮到你，你可以先把音频数据下载到本地，一边下载一边用NSFileHandler等接口读取本地音频文件并交给AudioFileStreamer或者AudioFile解析分离音频帧，分离出来的音频帧可以送给AudioQueue进行解码和播放。如果是本地文件直接读取文件解析即可。（这两个都是比较直接的做法，这类需求也可以用AVFoundation+本地server的方式实现，AVAudioPlayer会把请求发送给本地server，由本地server转发出去，获取数据后在本地server中存储并转送给AVAudioPlayer。另一个比较trick的做法是先把音频下载到文件中，在下载到一定量的数据后把文件路径给AVAudioPlayer播放，当然这种做法在音频seek后就回有问题了。）；
 
-* 如果你正在开发一个专业的音乐播放软件，需要对音频施加音效（均衡器、混响器），那么除了数据的读取以外还需要用到AudioConverter来把音频数据转换成PCM数据，再由AudioUnit+AUGraph来进行音效处理和播放（但目前多数带音效的app都是自己开发音效模块来坐PCM数据的处理，这部分功能自行开发在自定义性和扩展性上会比较强一些。PCM数据通过音效器处理完成后就可以使用AudioUnit播放了，当然AudioQueue也支持直接使对PCM数据进行播放。）。下图描述的就是使用AudioFile + AudioConverter + AudioUnit进行音频播放的流程（图片引自[官方文档](https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/ARoadmaptoCommonTasks/ARoadmaptoCommonTasks.html#//apple_ref/doc/uid/TP40003577-CH6-SW1)）。
+* 如果你正在开发一个专业的音乐播放软件，需要对音频施加音效（均衡器、混响器），那么除了数据的读取和解析以外还需要用到AudioConverter来把音频数据转换成PCM数据，再由AudioUnit+AUGraph来进行音效处理和播放（但目前多数带音效的app都是自己开发音效模块来坐PCM数据的处理，这部分功能自行开发在自定义性和扩展性上会比较强一些。PCM数据通过音效器处理完成后就可以使用AudioUnit播放了，当然AudioQueue也支持直接使对PCM数据进行播放。）。下图描述的就是使用AudioFile + AudioConverter + AudioUnit进行音频播放的流程（图片引自[官方文档](https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/ARoadmaptoCommonTasks/ARoadmaptoCommonTasks.html#//apple_ref/doc/uid/TP40003577-CH6-SW1)）。
 
 ![](/images/iOS-audio/audioUnitPlay.jpg)
 

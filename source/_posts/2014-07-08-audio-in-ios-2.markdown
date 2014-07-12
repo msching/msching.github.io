@@ -387,9 +387,17 @@ static void MyAudioSessionInterruptionListener(void *inClientData, UInt32 inInte
 
 ----
 
+#示例代码
+
+[这里](https://github.com/msching/MCAudioSession)有我自己写的`AudioSession`的封装，如果各位需要支持iOS 5和6的话可以使用一下。
+
+----
+
 #下篇预告
 
-下一篇将讲述如何使用AudioFileStreamer分离音频帧，以及如何使用AudioQueue进行播放。
+~~下一篇将讲述如何使用`AudioFileStreamer`分离音频帧，以及如何使用`AudioQueue`进行播放。~~
+
+下一篇将讲述如何使用`AudioFileStreamer`提取音频文件格式信息和分离音频帧。
 
 ----
 
