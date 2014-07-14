@@ -171,7 +171,7 @@
 
 <p>这才刚开始，坑就来了。这里会有两个问题：</p>
 
-<p>第一，AudioSessionInitialize方法只能被有效运行一次，也就是说<code>AudioSessionInterruptionListener</code>只能被设置一次，这就意味着这个打断回调方法是一个静态方法，一旦初始化成功以后所有的打断都会回调到这个方法，即便下一次再次调用AudioSessionInitialize并且把另一个静态方法作为参数传入，当打断到来时还是会回调到第一次设置的方法上。</p>
+<p>第一，AudioSessionInitialize可以被多次执行，但<code>AudioSessionInterruptionListener</code>只能被设置一次，这就意味着这个打断回调方法是一个静态方法，一旦初始化成功以后所有的打断都会回调到这个方法，即便下一次再次调用AudioSessionInitialize并且把另一个静态方法作为参数传入，当打断到来时还是会回调到第一次设置的方法上。</p>
 
 <p>这种场景并不少见，例如你的app既需要播放歌曲又需要录音，当然你不可能知道用户会先调用哪个功能，所以你必须在播放和录音的模块中都调用AudioSessionInitialize注册打断方法，但最终打断回调只会作用在先注册的那个模块中，很蛋疼吧。。。所以对于AudioSession的使用最好的方法是生成一个类单独进行管理，统一接收打断回调并发送自定义的打断通知，在需要用到AudioSession的模块中接收通知并做相应的操作。</p>
 
@@ -575,6 +575,61 @@
 </code></pre>
 
 <p>好吧，上面只是吐槽一下。请无视我吧。</p>
+
+<p><strong>2014.7.14补充：</strong></p>
+
+<p>发现即使之前已经调用过<code>AudioSessionInitialize</code>方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用<code>AudioSessionInitialize</code>方法来重新生成AudioSession。否则调用<code>AudioSessionSetActive</code>会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为&#8221;!ini&#8221;即<code>kAudioSessionNotInitialized</code>，这个情况在iOS 5.1.x上尤其频繁，iOS 7.x也偶有发生具体的原因还不知晓。</p>
+
+<p>所以每次在调用<code>AudioSessionSetActive</code>时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。（示例代码中的代码也更新了）</p>
+
+<p>附上OSStatus转成string的方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cp">#import &lt;Endian.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">NSString</span> <span class="o">*</span> <span class="nf">OSStatusToString</span><span class="p">(</span><span class="n">OSStatus</span> <span class="n">status</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">size_t</span> <span class="n">len</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">UInt32</span><span class="p">);</span>
+</span><span class='line'>    <span class="kt">long</span> <span class="n">addr</span> <span class="o">=</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">long</span><span class="p">)</span><span class="o">&amp;</span><span class="n">status</span><span class="p">;</span>
+</span><span class='line'>    <span class="kt">char</span> <span class="n">cstring</span><span class="p">[</span><span class="mi">5</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">len</span> <span class="o">=</span> <span class="p">(</span><span class="n">status</span> <span class="o">&gt;&gt;</span> <span class="mi">24</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">?</span> <span class="n">len</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">:</span> <span class="n">len</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">len</span> <span class="o">=</span> <span class="p">(</span><span class="n">status</span> <span class="o">&gt;&gt;</span> <span class="mi">16</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">?</span> <span class="n">len</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">:</span> <span class="n">len</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">len</span> <span class="o">=</span> <span class="p">(</span><span class="n">status</span> <span class="o">&gt;&gt;</span>  <span class="mi">8</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">?</span> <span class="n">len</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">:</span> <span class="n">len</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">len</span> <span class="o">=</span> <span class="p">(</span><span class="n">status</span> <span class="o">&gt;&gt;</span>  <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">?</span> <span class="n">len</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">:</span> <span class="n">len</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">addr</span> <span class="o">+=</span> <span class="p">(</span><span class="mi">4</span> <span class="o">-</span> <span class="n">len</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">status</span> <span class="o">=</span> <span class="n">EndianU32_NtoB</span><span class="p">(</span><span class="n">status</span><span class="p">);</span>        <span class="c1">// strings are big endian</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">strncpy</span><span class="p">(</span><span class="n">cstring</span><span class="p">,</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">addr</span><span class="p">,</span> <span class="n">len</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">cstring</span><span class="p">[</span><span class="n">len</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">return</span> <span class="p">[</span><span class="n">NSString</span> <span class="nl">stringWithCString:</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">cstring</span> <span class="nl">encoding:</span><span class="n">NSMacOSRomanStringEncoding</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
 
 <hr />
 
