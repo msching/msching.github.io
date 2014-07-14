@@ -63,7 +63,7 @@ typedef void (*AudioSessionInterruptionListener)(void * inClientData, UInt32 inI
 
 这才刚开始，坑就来了。这里会有两个问题：
 
-第一，AudioSessionInitialize方法只能被有效运行一次，也就是说`AudioSessionInterruptionListener`只能被设置一次，这就意味着这个打断回调方法是一个静态方法，一旦初始化成功以后所有的打断都会回调到这个方法，即便下一次再次调用AudioSessionInitialize并且把另一个静态方法作为参数传入，当打断到来时还是会回调到第一次设置的方法上。
+第一，AudioSessionInitialize可以被多次执行，但`AudioSessionInterruptionListener`只能被设置一次，这就意味着这个打断回调方法是一个静态方法，一旦初始化成功以后所有的打断都会回调到这个方法，即便下一次再次调用AudioSessionInitialize并且把另一个静态方法作为参数传入，当打断到来时还是会回调到第一次设置的方法上。
 
 这种场景并不少见，例如你的app既需要播放歌曲又需要录音，当然你不可能知道用户会先调用哪个功能，所以你必须在播放和录音的模块中都调用AudioSessionInitialize注册打断方法，但最终打断回调只会作用在先注册的那个模块中，很蛋疼吧。。。所以对于AudioSession的使用最好的方法是生成一个类单独进行管理，统一接收打断回调并发送自定义的打断通知，在需要用到AudioSession的模块中接收通知并做相应的操作。
 
@@ -317,6 +317,39 @@ extern OSStatus AudioSessionSetActiveWithFlags(Boolean active, UInt32 inFlags);
 	你们的app在使用xx语音软件听了一段话后就不会继续播放了，但xx音乐软件可以继续播放啊。
 
 好吧，上面只是吐槽一下。请无视我吧。
+
+**2014.7.14补充：**
+
+发现即使之前已经调用过`AudioSessionInitialize`方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用`AudioSessionInitialize`方法来重新生成AudioSession。否则调用`AudioSessionSetActive`会返回560557673，转换成string后为"!ini"即`kAudioSessionNotInitialized`，这个情况在iOS 5.1.x上尤其频繁，iOS 7.x也偶有发生具体的原因还不知晓。
+
+所以每次在调用`AudioSessionSetActive`时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。（示例代码中的代码也更新了）
+
+附上OSStatus转成string的方法：
+
+```objc
+#import <Endian.h>
+
+NSString * OSStatusToString(OSStatus status)
+{
+    size_t len = sizeof(UInt32);
+    long addr = (unsigned long)&status;
+    char cstring[5];
+    
+    len = (status >> 24) == 0 ? len - 1 : len;
+    len = (status >> 16) == 0 ? len - 1 : len;
+    len = (status >>  8) == 0 ? len - 1 : len;
+    len = (status >>  0) == 0 ? len - 1 : len;
+    
+    addr += (4 - len);
+    
+    status = EndianU32_NtoB(status);        // strings are big endian
+    
+    strncpy(cstring, (char *)addr, len);
+    cstring[len] = 0;
+    
+    return [NSString stringWithCString:(char *)cstring encoding:NSMacOSRomanStringEncoding];
+}
+```
 
 ----
 
