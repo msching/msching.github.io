@@ -34,9 +34,8 @@ AudioSession相关的类有两个：
 
 其中AudioSession在SDK 7中已经被标注为depracated，而AVAudioSession这个类虽然iOS 3开始就已经存在了，但其中很多方法和变量都是在iOS 6以后甚至是iOS 7才有的。所以各位可以依照以下标准选择：
 
-* 如果最低版本支持iOS 5，请使用`AudioSession`
-* 如果最低版本支持iOS 6及以上，可以考虑使用`AVAudioSession`
-* 如果最低版本支持iOS 7及以上，请使用`AVAudioSession`
+* 如果最低版本支持iOS 5，可以使用`AudioSession`，也可以使用`AVAudioSession`；
+* 如果最低版本支持iOS 6及以上，请使用`AVAudioSession`
 
 下面以`AudioSession`类为例来讲述AudioSession相关功能的使用（很不幸我需要支持iOS 5。。T-T，使用`AVAudioSession`的同学可以在其头文件中寻找对应的方法使用即可，需要注意的点我会加以说明）.
 
@@ -67,7 +66,7 @@ typedef void (*AudioSessionInterruptionListener)(void * inClientData, UInt32 inI
 
 这种场景并不少见，例如你的app既需要播放歌曲又需要录音，当然你不可能知道用户会先调用哪个功能，所以你必须在播放和录音的模块中都调用AudioSessionInitialize注册打断方法，但最终打断回调只会作用在先注册的那个模块中，很蛋疼吧。。。所以对于AudioSession的使用最好的方法是生成一个类单独进行管理，统一接收打断回调并发送自定义的打断通知，在需要用到AudioSession的模块中接收通知并做相应的操作。
 
-Apple也察觉到了这一点，所以在AVAudioSession中首先取消了Initialize方法，改为了单例方法`sharedInstance`。在iOS 6上所有的打断都需要通过设置`id<AVAudioSessionDelegate> delegate`并实现回调方法来实现，这同样会有上述的问题，所以在iOS6下仍然需要一个单独管理AudioSession的类存在。在iOS 7以后Apple终于把打断改成了通知的形式。。这下科学了。
+Apple也察觉到了这一点，所以在AVAudioSession中首先取消了Initialize方法，改为了单例方法`sharedInstance`。在iOS 5上所有的打断都需要通过设置`id<AVAudioSessionDelegate> delegate`并实现回调方法来实现，这同样会有上述的问题，所以在iOS 5使用AVAudioSession下仍然需要一个单独管理AudioSession的类存在。在iOS 6以后Apple终于把打断改成了通知的形式。。这下科学了。
 
 第二，AudioSessionInitialize方法的第四个参数inClientData，也就是回调方法的第一个参数。上面已经说了打断回调是一个静态方法，而这个参数的目的是为了能让回调时拿到context（上下文信息），所以这个inClientData需要是一个有足够长生命周期的对象（当然前提是你确实需要用到这个参数），如果这个对象被dealloc了，那么回调时拿到的inClientData会是一个野指针。就这一点来说构造一个单独管理AudioSession的类也是有必要的，因为这个类的生命周期和AudioSession一样长，我们可以把context保存在这个类中。
 
@@ -122,7 +121,7 @@ typedef NS_ENUM(NSUInteger, AVAudioSessionRouteChangeReason)
 }
 ```
 
-**注意：iOS 6下如果使用了`AVAudioSession`由于`AVAudioSessionDelegate`中并没有定义相关的方法，还是需要用这个方法来实现监听。iOS 7下直接监听AVAudioSession的通知就可以了。**
+**注意：iOS 5下如果使用了`AVAudioSession`由于`AVAudioSessionDelegate`中并没有定义相关的方法，还是需要用这个方法来实现监听。iOS 6下直接监听AVAudioSession的通知就可以了。**
 
 ----
 
@@ -293,6 +292,7 @@ extern OSStatus AudioSessionSetActiveWithFlags(Boolean active, UInt32 inFlags);
 
 //AVAudioSession的启动方法
 - (BOOL)setActive:(BOOL)active error:(NSError **)outError;
+- (BOOL)setActive:(BOOL)active withFlags:(NSInteger)flags error:(NSError **)outError NS_DEPRECATED_IOS(4_0, 6_0);
 - (BOOL)setActive:(BOOL)active withOptions:(AVAudioSessionSetActiveOptions)options error:(NSError **)outError NS_AVAILABLE_IOS(6_0);
 ```
 启动方法调用后必须要判断是否启动成功，启动不成功的情况经常存在，例如一个前台的app正在播放，你的app正在后台想要启动AudioSession那就会返回失败。
@@ -322,7 +322,7 @@ extern OSStatus AudioSessionSetActiveWithFlags(Boolean active, UInt32 inFlags);
 
 发现即使之前已经调用过`AudioSessionInitialize`方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用`AudioSessionInitialize`方法来重新生成AudioSession。否则调用`AudioSessionSetActive`会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为"!ini"即`kAudioSessionNotInitialized`，这个情况在iOS 5.1.x上尤其频繁，iOS 7.x也偶有发生具体的原因还不知晓。
 
-所以每次在调用`AudioSessionSetActive`时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。（示例代码中的代码也更新了）
+所以每次在调用`AudioSessionSetActive`时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。
 
 附上OSStatus转成string的方法：
 
@@ -355,7 +355,7 @@ NSString * OSStatusToString(OSStatus status)
 
 #打断处理
 
-正常启动AudioSession之后就可以播放音频了，下面要讲的是对于打断的处理。之前我们说到打断的回调在iOS5、6下需要统一管理，在收到打断开始和结束时需要发送自定义的通知。
+正常启动AudioSession之后就可以播放音频了，下面要讲的是对于打断的处理。之前我们说到打断的回调在iOS 5下需要统一管理，在收到打断开始和结束时需要发送自定义的通知。
 
 使用`AudioSession`时打断回调应该首先获取`kAudioSessionProperty_InterruptionType`，然后发送一个自定义的通知并带上对应的参数。
 
@@ -411,9 +411,8 @@ static void MyAudioSessionInterruptionListener(void *inClientData, UInt32 inInte
 
 关于AudioSession的话题到此结束（码字果然很累。。）。小结一下：
 
-* 如果最低版本支持iOS 5，请使用`AudioSession`，需要有一个类统一管理AudioSession的所有回调，在接到回调后发送对应的自定义通知；
-* 如果最低版本支持iOS 6及以上，可以考虑使用`AVAudioSession`，仍然需要统一管理AudioSession的回调，其中打断回调可以使用`AVAudioSessionDelegate`的方法进行监听；
-* 如果最低版本支持iOS 7及以上，请使用`AVAudioSession`，不用统一管理，接AVAudioSession的通知即可；
+* 如果最低版本支持iOS 5，可以使用`AudioSession`也可以考虑使用`AVAudioSession`，需要有一个类统一管理AudioSession的所有回调，在接到回调后发送对应的自定义通知；
+* 如果最低版本支持iOS 6及以上，请使用`AVAudioSession`，不用统一管理，接AVAudioSession的通知即可；
 * 根据app的应用场景合理选择`Category`；
 * 在deactive时需要注意app的应用场景来合理的选择是否使用`NotifyOthersOnDeactivation`参数；
 * 在处理InterruptEnd事件时需要注意`ShouldResume`的值。
@@ -422,7 +421,7 @@ static void MyAudioSessionInterruptionListener(void *inClientData, UInt32 inInte
 
 #示例代码
 
-[这里](https://github.com/msching/MCAudioSession)有我自己写的`AudioSession`的封装，如果各位需要支持iOS 5和6的话可以使用一下。
+[这里](https://github.com/msching/MCAudioSession)有我自己写的`AudioSession`的封装，如果各位需要支持iOS 5的话可以使用一下。
 
 ----
 
