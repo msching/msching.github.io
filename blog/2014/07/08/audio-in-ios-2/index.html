@@ -135,9 +135,8 @@
 <p>其中AudioSession在SDK 7中已经被标注为depracated，而AVAudioSession这个类虽然iOS 3开始就已经存在了，但其中很多方法和变量都是在iOS 6以后甚至是iOS 7才有的。所以各位可以依照以下标准选择：</p>
 
 <ul>
-<li>如果最低版本支持iOS 5，请使用<code>AudioSession</code></li>
-<li>如果最低版本支持iOS 6及以上，可以考虑使用<code>AVAudioSession</code></li>
-<li>如果最低版本支持iOS 7及以上，请使用<code>AVAudioSession</code></li>
+<li>如果最低版本支持iOS 5，可以使用<code>AudioSession</code>，也可以使用<code>AVAudioSession</code>；</li>
+<li>如果最低版本支持iOS 6及以上，请使用<code>AVAudioSession</code></li>
 </ul>
 
 
@@ -175,7 +174,7 @@
 
 <p>这种场景并不少见，例如你的app既需要播放歌曲又需要录音，当然你不可能知道用户会先调用哪个功能，所以你必须在播放和录音的模块中都调用AudioSessionInitialize注册打断方法，但最终打断回调只会作用在先注册的那个模块中，很蛋疼吧。。。所以对于AudioSession的使用最好的方法是生成一个类单独进行管理，统一接收打断回调并发送自定义的打断通知，在需要用到AudioSession的模块中接收通知并做相应的操作。</p>
 
-<p>Apple也察觉到了这一点，所以在AVAudioSession中首先取消了Initialize方法，改为了单例方法<code>sharedInstance</code>。在iOS 6上所有的打断都需要通过设置<code>id&lt;AVAudioSessionDelegate&gt; delegate</code>并实现回调方法来实现，这同样会有上述的问题，所以在iOS6下仍然需要一个单独管理AudioSession的类存在。在iOS 7以后Apple终于把打断改成了通知的形式。。这下科学了。</p>
+<p>Apple也察觉到了这一点，所以在AVAudioSession中首先取消了Initialize方法，改为了单例方法<code>sharedInstance</code>。在iOS 5上所有的打断都需要通过设置<code>id&lt;AVAudioSessionDelegate&gt; delegate</code>并实现回调方法来实现，这同样会有上述的问题，所以在iOS 5使用AVAudioSession下仍然需要一个单独管理AudioSession的类存在。在iOS 6以后Apple终于把打断改成了通知的形式。。这下科学了。</p>
 
 <p>第二，AudioSessionInitialize方法的第四个参数inClientData，也就是回调方法的第一个参数。上面已经说了打断回调是一个静态方法，而这个参数的目的是为了能让回调时拿到context（上下文信息），所以这个inClientData需要是一个有足够长生命周期的对象（当然前提是你确实需要用到这个参数），如果这个对象被dealloc了，那么回调时拿到的inClientData会是一个野指针。就这一点来说构造一个单独管理AudioSession的类也是有必要的，因为这个类的生命周期和AudioSession一样长，我们可以把context保存在这个类中。</p>
 
@@ -262,7 +261,7 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p><strong>注意：iOS 6下如果使用了<code>AVAudioSession</code>由于<code>AVAudioSessionDelegate</code>中并没有定义相关的方法，还是需要用这个方法来实现监听。iOS 7下直接监听AVAudioSession的通知就可以了。</strong></p>
+<p><strong>注意：iOS 5下如果使用了<code>AVAudioSession</code>由于<code>AVAudioSessionDelegate</code>中并没有定义相关的方法，还是需要用这个方法来实现监听。iOS 6下直接监听AVAudioSession的通知就可以了。</strong></p>
 
 <hr />
 
@@ -540,12 +539,14 @@
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
+<span class='line-number'>8</span>
 </pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//AudioSession的启动方法</span>
 </span><span class='line'><span class="k">extern</span> <span class="n">OSStatus</span> <span class="nf">AudioSessionSetActive</span><span class="p">(</span><span class="n">Boolean</span> <span class="n">active</span><span class="p">);</span>
 </span><span class='line'><span class="k">extern</span> <span class="n">OSStatus</span> <span class="nf">AudioSessionSetActiveWithFlags</span><span class="p">(</span><span class="n">Boolean</span> <span class="n">active</span><span class="p">,</span> <span class="n">UInt32</span> <span class="n">inFlags</span><span class="p">);</span>
 </span><span class='line'>
 </span><span class='line'><span class="c1">//AVAudioSession的启动方法</span>
 </span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">setActive:</span><span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nv">active</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">setActive:</span><span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nv">active</span> <span class="nf">withFlags:</span><span class="p">(</span><span class="n">NSInteger</span><span class="p">)</span><span class="nv">flags</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_DEPRECATED_IOS</span><span class="p">(</span><span class="mi">4</span><span class="n">_0</span><span class="p">,</span> <span class="mi">6</span><span class="n">_0</span><span class="p">);</span>
 </span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">setActive:</span><span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nv">active</span> <span class="nf">withOptions:</span><span class="p">(</span><span class="n">AVAudioSessionSetActiveOptions</span><span class="p">)</span><span class="nv">options</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span> <span class="n">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">6</span><span class="n">_0</span><span class="p">);</span>
 </span></code></pre></td></tr></table></div></figure>
 
@@ -580,7 +581,7 @@
 
 <p>发现即使之前已经调用过<code>AudioSessionInitialize</code>方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用<code>AudioSessionInitialize</code>方法来重新生成AudioSession。否则调用<code>AudioSessionSetActive</code>会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为&#8221;!ini&#8221;即<code>kAudioSessionNotInitialized</code>，这个情况在iOS 5.1.x上尤其频繁，iOS 7.x也偶有发生具体的原因还不知晓。</p>
 
-<p>所以每次在调用<code>AudioSessionSetActive</code>时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。（示例代码中的代码也更新了）</p>
+<p>所以每次在调用<code>AudioSessionSetActive</code>时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。</p>
 
 <p>附上OSStatus转成string的方法：</p>
 
@@ -635,7 +636,7 @@
 
 <h1>打断处理</h1>
 
-<p>正常启动AudioSession之后就可以播放音频了，下面要讲的是对于打断的处理。之前我们说到打断的回调在iOS5、6下需要统一管理，在收到打断开始和结束时需要发送自定义的通知。</p>
+<p>正常启动AudioSession之后就可以播放音频了，下面要讲的是对于打断的处理。之前我们说到打断的回调在iOS 5下需要统一管理，在收到打断开始和结束时需要发送自定义的通知。</p>
 
 <p>使用<code>AudioSession</code>时打断回调应该首先获取<code>kAudioSessionProperty_InterruptionType</code>，然后发送一个自定义的通知并带上对应的参数。</p>
 
@@ -730,9 +731,8 @@
 <p>关于AudioSession的话题到此结束（码字果然很累。。）。小结一下：</p>
 
 <ul>
-<li>如果最低版本支持iOS 5，请使用<code>AudioSession</code>，需要有一个类统一管理AudioSession的所有回调，在接到回调后发送对应的自定义通知；</li>
-<li>如果最低版本支持iOS 6及以上，可以考虑使用<code>AVAudioSession</code>，仍然需要统一管理AudioSession的回调，其中打断回调可以使用<code>AVAudioSessionDelegate</code>的方法进行监听；</li>
-<li>如果最低版本支持iOS 7及以上，请使用<code>AVAudioSession</code>，不用统一管理，接AVAudioSession的通知即可；</li>
+<li>如果最低版本支持iOS 5，可以使用<code>AudioSession</code>也可以考虑使用<code>AVAudioSession</code>，需要有一个类统一管理AudioSession的所有回调，在接到回调后发送对应的自定义通知；</li>
+<li>如果最低版本支持iOS 6及以上，请使用<code>AVAudioSession</code>，不用统一管理，接AVAudioSession的通知即可；</li>
 <li>根据app的应用场景合理选择<code>Category</code>；</li>
 <li>在deactive时需要注意app的应用场景来合理的选择是否使用<code>NotifyOthersOnDeactivation</code>参数；</li>
 <li>在处理InterruptEnd事件时需要注意<code>ShouldResume</code>的值。</li>
@@ -743,7 +743,7 @@
 
 <h1>示例代码</h1>
 
-<p><a href="https://github.com/msching/MCAudioSession">这里</a>有我自己写的<code>AudioSession</code>的封装，如果各位需要支持iOS 5和6的话可以使用一下。</p>
+<p><a href="https://github.com/msching/MCAudioSession">这里</a>有我自己写的<code>AudioSession</code>的封装，如果各位需要支持iOS 5的话可以使用一下。</p>
 
 <hr />
 
