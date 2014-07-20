@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "iOS音频播放 (三)：AudioFileStream"
-subtitle: "Audio in iOS (Part 3) : AudioFileStream"
+subtitle: "Audio playback in iOS (Part 3) : AudioFileStream"
 date: 2014-07-09 11:31:28 +0800
 comments: true
 statement: true

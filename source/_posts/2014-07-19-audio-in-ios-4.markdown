@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "iOS音频播放 (四)：AudioFile"
-subtitle: "Audio in iOS (Part 4) : AudioFile"
+subtitle: "Audio playback in iOS (Part 4) : AudioFile"
 date: 2014-07-19 13:38:30 +0800
 comments: true
 statement: true

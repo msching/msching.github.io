@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "iOS音频播放 (一)：概述"
-subtitle: "Audio in iOS (Part 1) : Introduction"
+subtitle: "Audio playback in iOS (Part 1) : Introduction"
 date: 2014-07-07 14:40:42 +0800
 comments: true
 statement: true
