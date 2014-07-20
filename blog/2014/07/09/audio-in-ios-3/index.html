@@ -107,7 +107,7 @@
 
 <p>本来说好是要在第三篇中讲<code>AudioFileStream</code>和<code>AudioQueue</code>，但写着写着发现光<code>AudioFileStream</code>就好多内容，最后还是决定分篇介绍，这篇先来说一下<code>AudioFileStream</code>，下一篇计划说一下和<code>AudioFileStream</code>类似的<code>AudioFile</code>，下下篇再来说<code>AudioQueue</code>。</p>
 
-<p>在本片那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
+<p>在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
 
 <hr />
 
@@ -469,7 +469,7 @@
 
 <p>4、<code>kAudioFileStreamProperty_FormatList</code></p>
 
-<p>作用和<code>kAudioFileStreamProperty_DataFormat</code>是一样的，区别在于用这个PropertyID获取到是一个AudioStreamBasicDescription的数组，这个参数是用来支持AAC SBR这样的包含多个文件类型的银屏格式。</p>
+<p>作用和<code>kAudioFileStreamProperty_DataFormat</code>是一样的，区别在于用这个PropertyID获取到是一个AudioStreamBasicDescription的数组，这个参数是用来支持AAC SBR这样的包含多个文件类型的音频格式。由于到底有多少个format我们并不知晓，所以需要先获取一下总数据大小：</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -492,7 +492,11 @@
 <span class='line-number'>19</span>
 <span class='line-number'>20</span>
 <span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">Boolean</span> <span class="n">outWriteable</span><span class="p">;</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//获取数据大小</span>
+</span><span class='line'><span class="n">Boolean</span> <span class="n">outWriteable</span><span class="p">;</span>
 </span><span class='line'><span class="n">UInt32</span> <span class="n">formatListSize</span><span class="p">;</span>
 </span><span class='line'><span class="n">OSStatus</span> <span class="n">status</span> <span class="o">=</span> <span class="n">AudioFileStreamGetPropertyInfo</span><span class="p">(</span><span class="n">inAudioFileStream</span><span class="p">,</span> <span class="n">kAudioFileStreamProperty_FormatList</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">formatListSize</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">outWriteable</span><span class="p">);</span>
 </span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">status</span> <span class="o">!=</span> <span class="n">noErr</span><span class="p">)</span>
@@ -500,6 +504,7 @@
 </span><span class='line'>    <span class="c1">//错误处理</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
+</span><span class='line'><span class="c1">//获取formatlist</span>
 </span><span class='line'><span class="n">AudioFormatListItem</span> <span class="o">*</span><span class="n">formatList</span> <span class="o">=</span> <span class="n">malloc</span><span class="p">(</span><span class="n">formatListSize</span><span class="p">);</span>
 </span><span class='line'><span class="n">OSStatus</span> <span class="n">status</span> <span class="o">=</span> <span class="n">AudioFileStreamGetProperty</span><span class="p">(</span><span class="n">inAudioFileStream</span><span class="p">,</span> <span class="n">kAudioFileStreamProperty_FormatList</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">formatListSize</span><span class="p">,</span> <span class="n">formatList</span><span class="p">);</span>
 </span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">status</span> <span class="o">!=</span> <span class="n">noErr</span><span class="p">)</span>
@@ -507,6 +512,7 @@
 </span><span class='line'>    <span class="c1">//错误处理</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
+</span><span class='line'><span class="c1">//选择需要的格式</span>
 </span><span class='line'><span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">AudioFormatListItem</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">formatListSize</span><span class="p">;</span> <span class="n">i</span> <span class="o">+=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">AudioFormatListItem</span><span class="p">))</span>
 </span><span class='line'><span class="p">{</span>
 </span><span class='line'>    <span class="n">AudioStreamBasicDescription</span> <span class="n">pasbd</span> <span class="o">=</span> <span class="n">formatList</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mASBD</span><span class="p">;</span>
@@ -717,7 +723,7 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>inPacketDescriptions这个字段为空时需要按CBR的数据处理。但其实在解析CBR数据时inPacketDescriptions一般也会有返回，因为即使是CBR数据帧的大小也不是恒定不变的，例如CBR的MP3会在每一帧的数据后放1 byte的填充位，这个填充位也并非时时刻刻存在，所以帧的大小会有1 byte的浮动。（比如采样率44.1KHZ，码率160kbps的CBR MP3文件每一帧的大小在522字节和523字节浮动。）</p>
+<p>inPacketDescriptions这个字段为空时需要按CBR的数据处理。但其实在解析CBR数据时inPacketDescriptions一般也会有返回，因为即使是CBR数据帧的大小也不是恒定不变的，例如CBR的MP3会在每一帧的数据后放1 byte的填充位，这个填充位也并非时时刻刻存在，所以帧的大小会有1 byte的浮动。（比如采样率44.1KHZ，码率160kbps的CBR MP3文件每一帧的大小在522字节和523字节浮动。所以不能因为有inPacketDescriptions没有返回NULL而判定音频数据就是VBR编码的）。</p>
 
 <hr />
 
@@ -831,7 +837,7 @@
 
 <ul>
 <li><p>使用<code>AudioFileStream</code>首先需要调用<code>AudioFileStreamOpen</code>，需要注意的是尽量提供inFileTypeHint参数帮助<code>AudioFileStream</code>解析数据，调用完成后记录<code>AudioFileStreamID</code>；</p></li>
-<li><p>当有数据时调用<code>AudioFileStreamParseBytes</code>进行解析，每一次解析都需要注意返回值，返回值一旦出现noErr意外的值就代表Parse出错，其中<code>kAudioFileStreamError_NotOptimized</code>代表该文件缺少头信息或者其头信息在文件尾部不适合流播放；</p></li>
+<li><p>当有数据时调用<code>AudioFileStreamParseBytes</code>进行解析，每一次解析都需要注意返回值，返回值一旦出现noErr以外的值就代表Parse出错，其中<code>kAudioFileStreamError_NotOptimized</code>代表该文件缺少头信息或者其头信息在文件尾部不适合流播放；</p></li>
 <li><p>使用<code>AudioFileStreamParseBytes</code>需要注意第四个参数在需要合适的时候传入<code>kAudioFileStreamParseFlag_Discontinuity</code>；</p></li>
 <li><p>调用<code>AudioFileStreamParseBytes</code>后会首先同步进入<code>AudioFileStream_PropertyListenerProc</code>回调来解析文件格式信息，如果回调得到<code>kAudioFileStreamProperty_ReadyToProducePackets</code>表示解析格式信息完成；</p></li>
 <li><p>解析格式信息完成后继续调用<code>AudioFileStreamParseBytes</code>会进入<code>MyAudioFileStreamPacketsCallBack</code>回调来分离音频帧，在回调中应该将分离出来的帧信息保存到自己的buffer中</p></li>
@@ -844,7 +850,7 @@
 
 <h1>示例代码</h1>
 
-<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>这两份优秀的开源播放器都用到<code>AudioFileStream</code>大家也可以借鉴。我自己也写了一个<a href="https://github.com/msching/MCAudioFileStream">简单的AudioFileStream封装</a>。</p>
+<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>这两个优秀的开源播放器都用到<code>AudioFileStream</code>大家可以借鉴。我自己也写了一个<a href="https://github.com/msching/MCAudioFileStream">简单的AudioFileStream封装</a>。</p>
 
 <hr />
 

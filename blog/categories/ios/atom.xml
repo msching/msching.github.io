@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-07-15T11:36:49+08:00</updated>
+  <updated>2014-07-20T16:37:10+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,482 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[iOS音频播放 (四)：AudioFile]]></title>
+    <link href="http://msching.github.io/blog/2014/07/19/audio-in-ios-4/"/>
+    <updated>2014-07-19T13:38:30+08:00</updated>
+    <id>http://msching.github.io/blog/2014/07/19/audio-in-ios-4</id>
+    <content type="html"><![CDATA[<h1>前言</h1>
+
+<p>接着<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>的<code>AudioStreamFile</code>这一篇要来聊一下<code>AudioFile</code>。和<code>AudioStreamFile</code>一样<code>AudioFile</code>是<code>AudioToolBox</code> framework中的一员，它也能够完成<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>所述的第2步，读取音频格式信息和进行帧分离，但事实上它的功能远不止如此。</p>
+
+<hr />
+
+<h1>AudioFile介绍</h1>
+
+<p>按照<a href="https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL">官方文档</a>的描述：</p>
+
+<p><code>a C programming interface that enables you to read or write a wide variety of audio data to or from disk or a memory buffer.With Audio File Services you can:</code></p>
+
+<ul>
+<li>Create, initialize, open, and close audio files</li>
+<li>Read and write audio files</li>
+<li>Optimize audio files</li>
+<li>Work with user data and global information</li>
+</ul>
+
+
+<p>这个类可以用来创建、初始化音频文件；读写音频数据；对音频文件进行优化；读取和写入音频格式信息等等，功能十分强大，可见它不但可以用来支持音频播放，甚至可以用来生成音频文件。当然，在本篇文章中只会涉及一些和音频播放相关的内容（打开音频文件、读取格式信息、读取音频数据，其实我也只对这些方法有一点了解，其余的功能没用过。。>_&lt;）.</p>
+
+<hr />
+
+<h1>AudioFile的打开“姿势”</h1>
+
+<p><code>AudioFile</code>提供了两个打开文件的方法：</p>
+
+<p>1、 <code>AudioFileOpenURL</code></p>
+
+<p>```objc</p>
+
+<p>enum {</p>
+
+<pre><code>kAudioFileReadPermission      = 0x01,
+kAudioFileWritePermission     = 0x02,
+kAudioFileReadWritePermission = 0x03
+</code></pre>
+
+<p>};</p>
+
+<p>extern OSStatus AudioFileOpenURL (CFURLRef inFileRef,</p>
+
+<pre><code>                                SInt8 inPermissions,
+                                AudioFileTypeID inFileTypeHint,
+                                AudioFileID * outAudioFile);
+</code></pre>
+
+<p>```</p>
+
+<p>从方法的定义上来看是用来读取本地文件的：</p>
+
+<p>第一个参数，文件路径；</p>
+
+<p>第二个参数，文件的允许使用方式，是读、写还是读写，如果打开文件后进行了允许使用方式以外的操作，就得到<code>kAudioFilePermissionsError</code>错误码（比如Open时声明是<code>kAudioFileReadPermission</code>但却调用了<code>AudioFileWriteBytes</code>）；</p>
+
+<p>第三个参数，和<code>AudioFileStream</code>的open方法中一样是一个帮助<code>AudioFile</code>解析文件的类型提示，如果文件类型确定的话应当传入；</p>
+
+<p>第四个参数，返回AudioFile实例对应的<code>AudioFileID</code>，这个ID需要保存起来作为后续一些方法的参数使用；</p>
+
+<p>返回值用来判断是否成功打开文件（OSSStatus == noErr）。</p>
+
+<hr />
+
+<p>2、 <code>AudioFileOpenWithCallbacks</code></p>
+
+<p>```objc
+extern OSStatus AudioFileOpenWithCallbacks (void * inClientData,</p>
+
+<pre><code>                                          AudioFile_ReadProc inReadFunc,
+                                          AudioFile_WriteProc inWriteFunc,
+                                          AudioFile_GetSizeProc inGetSizeFunc,
+                                          AudioFile_SetSizeProc inSetSizeFunc,
+                                          AudioFileTypeID inFileTypeHint,
+                                          AudioFileID * outAudioFile);
+</code></pre>
+
+<p>```</p>
+
+<p>看过第一个Open方法后，这个方法乍看上去让人有点迷茫，没有URL的参数如何告诉AudioFile该打开哪个文件？还是先来看一下参数的说明吧：</p>
+
+<p>第一个参数，上下文信息，不再多做解释；</p>
+
+<p>第二个参数，当<code>AudioFile</code>需要读音频数据时进行的回调（调用Open和Read方式后<code>同步</code>回调）；</p>
+
+<p>第三个参数，当<code>AudioFile</code>需要写音频数据时进行的回调（写音频文件功能时使用，暂不讨论）；</p>
+
+<p>第四个参数，当<code>AudioFile</code>需要用到文件的总大小时回调（调用Open和Read方式后<code>同步</code>回调）；</p>
+
+<p>第五个参数，当<code>AudioFile</code>需要设置文件的大小时回调（写音频文件功能时使用，暂不讨论）；</p>
+
+<p>第六、七个参数和返回值同<code>AudioFileOpenURL</code>方法；</p>
+
+<p>这个方法的重点在于<code>AudioFile_ReadProc</code>这个回调。换一个角度理解，这个方法相比于第一个方法自由度更高，AudioFile需要的只是一个数据源，无论是磁盘上的文件、内存里的数据甚至是网络流只要能在<code>AudioFile</code>需要数据时（Open和Read时）通过<code>AudioFile_ReadProc</code>回调为AudioFile提供合适的数据就可以了，也就是说使用方法不仅仅可以读取本地文件也可以如<code>AudioFileStream</code>一样以流的形式读取数据。</p>
+
+<hr />
+
+<p>下面来看一下<code>AudioFile_GetSizeProc</code>和<code>AudioFile_ReadProc</code>这两个读取功能相关的回调
+```objc
+typedef SInt64 (*AudioFile_GetSizeProc)(void * inClientData);</p>
+
+<p>typedef OSStatus (*AudioFile_ReadProc)(void * inClientData,</p>
+
+<pre><code>                                     SInt64 inPosition,
+                                     UInt32 requestCount,
+                                     void * buffer, 
+                                     UInt32 * actualCount);
+</code></pre>
+
+<p>```</p>
+
+<p>首先是<code>AudioFile_GetSizeProc</code>回调，这个回调很好理解，返回文件总长度即可，总长度的获取途径自然是文件系统或者httpResponse等等。</p>
+
+<p>接下来是<code>AudioFile_ReadProc</code>回调：</p>
+
+<p>第一个参数，上下文对象，不再赘述；</p>
+
+<p>第二个参数，需要读取第几个字节开始的数据；</p>
+
+<p>第三个参数，需要读取的数据长度；</p>
+
+<p>第四个参数，返回参数，是一个数据指针并且其空间已经被分配，我们需要做的是把数据memcpy到buffer中；</p>
+
+<p>第五个参数，实际提供的数据长度，即memcpy到buffer中的数据长度；</p>
+
+<p>返回值，如果没有任何异常产生就返回noErr，如果有异常可以根据异常类型选择需要的error常量返回（一般用不到其他返回值，返回noErr就足够了）；</p>
+
+<p>这里需要解释一下这个回调方法的工作方式。<code>AudioFile</code>需要数据时会调用回调方法，需要数据的时间点有两个：</p>
+
+<ol>
+<li><p>Open方法调用时，由于<code>AudioFile</code>的Open方法调用过程中就会对音频格式信息进行解析，只有符合要求的音频格式才能被成功打开否则Open方法就会返回错误码（换句话说，Open方法一旦调用成功就相当于<code>AudioStreamFile</code>在Parse后返回<code>ReadyToProducePackets</code>一样，只要Open成功就可以开始读取音频数据，详见<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>），所以在Open方法调用的过程中就需要提供一部分音频数据来进行解析；</p></li>
+<li><p>Read相关方法调用时，这个不需要多说很好理解；</p></li>
+</ol>
+
+
+<p>通过回调提供数据时需要注意inPosition和requestCount参数，这两个参数指明了本次回调需要提供的数据范围是从inPosition开始requestCount个字节的数据。这里又可以分为两种情况：</p>
+
+<ol>
+<li><p>有充足的数据：那么我们需要把这个范围内的数据拷贝到buffer中，并且给actualCount赋值requestCount，最后返回noError；</p></li>
+<li><p>数据不足：没有充足数据的话就只能把手头有的数据拷贝到buffer中，需要注意的是这部分被拷贝的数据必须是从inPosition开始的<code>连续数据</code>，拷贝完成后给actualCount赋值实际拷贝进buffer中的数据长度后返回noErr，这个过程可以用下面的代码来表示：</p></li>
+</ol>
+
+
+<p>```objc
+static OSStatus MyAudioFileReadCallBack(void *inClientData,</p>
+
+<pre><code>                                    SInt64 inPosition,
+                                    UInt32 requestCount,
+                                    void *buffer,
+                                    UInt32 *actualCount)
+</code></pre>
+
+<p>{</p>
+
+<pre><code>__unsafe_unretained MyContext *context = (__bridge MyContext *)inClientData;
+
+*actualCount = [context availableDataLengthAtOffset:inPosition maxLength:requestCount];
+if (*actualCount &gt; 0)
+{
+    NSData *data = [context dataAtOffset:inPosition length:*actualCount];
+    memcpy(buffer, [data bytes], [data length]);
+}
+
+return noErr;
+</code></pre>
+
+<p>}</p>
+
+<p>```</p>
+
+<p>说到这里又需要分两种情况：</p>
+
+<p>2.1. Open方法调用时的回调数据不足：AudioFile的Open方法会根据文件格式类型分几步进行数据读取以解析确定是否是一个合法的文件格式，其中每一步的inPosition和requestCount都不一样，如果某一步不成功就会直接进行下一步，如果几部下来都失败了，那么Open方法就会失败。简单的说就是在调用Open之前首先需要保证音频文件的格式信息完整，这就意味着<code>AudioFile</code>并不能独立用于音频流的读取，在流播放时首先需要使用<code>AudioStreamFile</code>来得到<code>ReadyToProducePackets</code>标志位来保证信息完整；</p>
+
+<p>2.2. Read方法调用时的回调数据不足：这种情况下inPosition和requestCount的数值与Read方法调用时传入的参数有关，数据不足对于Read方法本身没有影响，只要回调返回noErr，Read就成功，只是实际交给Read方法的调用方的数据会不足，那么就把这个问题的处理交给了Read的调用方；</p>
+
+<hr />
+
+<h1>读取音频格式信息</h1>
+
+<p>成功打开音频文件后就可以读取其中的格式信息了，读取用到的方法如下：</p>
+
+<p>```objc
+extern OSStatus AudioFileGetPropertyInfo(AudioFileID inAudioFile,</p>
+
+<pre><code>                                       AudioFilePropertyID inPropertyID,
+                                       UInt32 * outDataSize,
+                                       UInt32 * isWritable);
+</code></pre>
+
+<p>extern OSStatus AudioFileGetProperty(AudioFileID inAudioFile,</p>
+
+<pre><code>                                   AudioFilePropertyID inPropertyID,
+                                   UInt32 * ioDataSize,
+                                   void * outPropertyData); 
+</code></pre>
+
+<p><code>``
+</code>AudioFileGetPropertyInfo<code>方法用来获取某个属性对应的数据的大小（outDataSize）以及该属性是否可以被write（isWritable），而</code>AudioFileGetProperty<code>则用来获取属性对应的数据。对于一些大小可变的属性需要先使用</code>AudioFileGetPropertyInfo<code>获取数据大小才能取获取数据（例如formatList），而有些确定类型单个属性则不必先调用</code>AudioFileGetPropertyInfo<code>直接调用</code>AudioFileGetProperty`即可（比如BitRate），例子如下：</p>
+
+<p>```objc
+AudioFileID fileID; //Open方法返回的AudioFileID</p>
+
+<p>//获取格式信息
+UInt32 formatListSize = 0;
+OSStatus status = AudioFileGetPropertyInfo(_fileID, kAudioFilePropertyFormatList, &amp;formatListSize, NULL);
+if (status == noErr)
+{</p>
+
+<pre><code>AudioFormatListItem *formatList = (AudioFormatListItem *)malloc(formatListSize);
+status = AudioFileGetProperty(fileID, kAudioFilePropertyFormatList, &amp;formatListSize, formatList);
+if (status == noErr)
+{
+    for (int i = 0; i * sizeof(AudioFormatListItem) &lt; formatListSize; i += sizeof(AudioFormatListItem))
+    {
+        AudioStreamBasicDescription pasbd = formatList[i].mASBD;
+        //选择需要的格式。。                             
+    }
+}
+free(formatList);
+</code></pre>
+
+<p>}</p>
+
+<p>//获取码率
+UInt32 bitRate;
+UInt32 bitRateSize = sizeof(bitRate);
+status = AudioFileGetProperty(fileID, kAudioFilePropertyBitRate, &amp;size, &amp;bitRate);
+if (status != noErr)
+{</p>
+
+<pre><code>//错误处理
+</code></pre>
+
+<p>}
+```
+可以获取的属性有下面这些，大家可以参考文档来获取自己需要的信息（注意到这里有EstimatedDuration，可以得到Duration了）：</p>
+
+<p>```
+enum
+{</p>
+
+<pre><code>kAudioFilePropertyFileFormat                =   'ffmt',
+kAudioFilePropertyDataFormat                =   'dfmt',
+kAudioFilePropertyIsOptimized           =   'optm',
+kAudioFilePropertyMagicCookieData       =   'mgic',
+kAudioFilePropertyAudioDataByteCount        =   'bcnt',
+kAudioFilePropertyAudioDataPacketCount  =   'pcnt',
+kAudioFilePropertyMaximumPacketSize     =   'psze',
+kAudioFilePropertyDataOffset                =   'doff',
+kAudioFilePropertyChannelLayout         =   'cmap',
+kAudioFilePropertyDeferSizeUpdates      =   'dszu',
+kAudioFilePropertyMarkerList                =   'mkls',
+kAudioFilePropertyRegionList                =   'rgls',
+kAudioFilePropertyChunkIDs              =   'chid',
+kAudioFilePropertyInfoDictionary            =   'info',
+kAudioFilePropertyPacketTableInfo       =   'pnfo',
+kAudioFilePropertyFormatList                =   'flst',
+kAudioFilePropertyPacketSizeUpperBound      =   'pkub',
+kAudioFilePropertyReserveDuration       =   'rsrv',
+kAudioFilePropertyEstimatedDuration     =   'edur',
+kAudioFilePropertyBitRate               =   'brat',
+kAudioFilePropertyID3Tag                    =   'id3t',
+kAudioFilePropertySourceBitDepth            =   'sbtd',
+kAudioFilePropertyAlbumArtwork          =   'aart',
+</code></pre>
+
+<p>  kAudioFilePropertyAudioTrackCount         =    &lsquo;atct&rsquo;,</p>
+
+<pre><code>kAudioFilePropertyUseAudioTrack         =   'uatk'
+</code></pre>
+
+<p>};<br/>
+```</p>
+
+<hr />
+
+<h1>读取音频数据</h1>
+
+<p>读取音频数据的方法分为两类：</p>
+
+<p>1、直接读取音频数据：</p>
+
+<p>```objc
+extern OSStatus AudioFileReadBytes (AudioFileID inAudioFile,</p>
+
+<pre><code>                                  Boolean inUseCache,
+                                  SInt64 inStartingByte,
+                                  UInt32 * ioNumBytes,
+                                  void * outBuffer);
+</code></pre>
+
+<p>```</p>
+
+<p>第一个参数，FileID；</p>
+
+<p>第二个参数，是否需要cache，一般来说传false；</p>
+
+<p>第三个参数，从第几个byte开始读取数据</p>
+
+<p>第四个参数，这个参数在调用时作为输入参数表示需要读取读取多少数据，调用完成后作为输出参数表示实际读取了多少数据（即Read回调中的requestCount和actualCount）；</p>
+
+<p>第五个参数，buffer指针，需要事先分配好足够大的内存（ioNumBytes大，即Read回调中的buffer，所以Read回调中不需要再分配内存）；</p>
+
+<p>返回值表示是否读取成功，EOF时会返回<code>kAudioFileEndOfFileError</code>；</p>
+
+<p>使用这个方法得到的数据都是没有进行过帧分离的数据，如果想要用来播放或者解码还必须通过<code>AudioFileStream</code>进行帧分离；</p>
+
+<p>2、按帧（Packet）读取音频数据：</p>
+
+<p>```objc
+extern OSStatus AudioFileReadPacketData (AudioFileID inAudioFile,</p>
+
+<pre><code>                                       Boolean inUseCache,
+                                       UInt32 * ioNumBytes,
+                                       AudioStreamPacketDescription * outPacketDescriptions,
+                                       SInt64 inStartingPacket,
+                                       UInt32 * ioNumPackets,
+                                       void * outBuffer);
+</code></pre>
+
+<p>extern OSStatus AudioFileReadPackets (AudioFileID inAudioFile,</p>
+
+<pre><code>                                    Boolean inUseCache,
+                                    UInt32 * outNumBytes,
+                                    AudioStreamPacketDescription * outPacketDescriptions,
+                                    SInt64 inStartingPacket, 
+                                    UInt32 * ioNumPackets, 
+                                    void * outBuffer);
+</code></pre>
+
+<p>```
+按帧读取的方法有两个，这两个方法看上去差不多，就连参数也几乎相同，但使用场景和效率上却有所不同，<a href="https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL">官方文档</a>中如此描述这两个方法：</p>
+
+<ul>
+<li><code>AudioFileReadPacketData</code> is memory efficient when reading variable bit-rate (VBR) audio data;</li>
+<li><code>AudioFileReadPacketData</code> is more efficient than <code>AudioFileReadPackets</code> when reading compressed file formats that do not have packet tables, such as MP3 or ADTS. This function is a good choice for reading either CBR (constant bit-rate) or VBR data if you do not need to read a fixed duration of audio.</li>
+<li>Use <code>AudioFileReadPackets</code> only when you need to read a fixed duration of audio data, or when you are reading only uncompressed audio.</li>
+</ul>
+
+
+<p>只有当需要读取固定时长音频或者非压缩音频时才会用到<code>AudioFileReadPackets</code>，其余时候使用<code>AudioFileReadPacketData</code>会有更高的效率并且更省内存；</p>
+
+<p>下面来看看这些参数：</p>
+
+<p>第一、二个参数，同<code>AudioFileReadBytes</code>；</p>
+
+<p>第三个参数，对于<code>AudioFileReadPacketData</code>来说ioNumBytes这个参数在输入输出时都要用到，在输入时表示outBuffer的size，输出时表示实际读取了多少size的数据。而对<code>AudioFileReadPackets</code>来说outNumBytes只在输出时使用，表示实际读取了多少size的数据；</p>
+
+<p>第四个参数，帧信息数组指针，在输入前需要分配内存，大小必须足够存在ioNumPackets个帧信息（ioNumPackets * sizeof(AudioStreamPacketDescription)）；</p>
+
+<p>第五个参数，在输入时表示需要读取多少个帧，在输出时表示实际读取了多少帧；</p>
+
+<p>第六个参数，outBuffer数据指针，在输入前就需要分配好空间，这个参数看上去两个方法一样但其实并非如此。对于<code>AudioFileReadPacketData</code>来说只要分配<code>近似帧大小 * 帧数</code>的内存空间即可，方法本身会针对给定的内存空间大小来决定最后输出多少个帧，如果空间不够会适当减少出的帧数；而对于<code>AudioFileReadPackets</code>来说则需要分配<code>最大帧大小(或帧大小上界) * 帧数</code>的内存空间才行（最大帧大小和帧大小上界的区别等下会说）；这也就是为何第三个参数一个是输入输出双向使用的，而另一个只是输出时使用的原因。就这点来说两个方法中前者在使用的过程中要比后者更省内存；</p>
+
+<p>返回值，同<code>AudioFileReadBytes</code>；</p>
+
+<p>这两个方法读取后的数据为帧分离后的数据，可以直接用来播放或者解码。</p>
+
+<p>下面给出两个方法的使用代码（以MP3为例）：</p>
+
+<p>```objc
+AudioFileID fileID; //Open方法返回的AudioFileID
+UInt32 ioNumPackets = &hellip;; //要读取多少个packet
+SInt64 inStartingPacket = &hellip;; //从第几个Packet开始读取</p>
+
+<p>UInt32 bitRate = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyBitRate
+UInt32 sampleRate = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyDataFormat或kAudioFilePropertyFormatList
+UInt32 byteCountPerPacket = 144 * bitRate / sampleRate; //MP3数据每个Packet的近似大小</p>
+
+<p>UInt32 descSize = sizeof(AudioStreamPacketDescription) * ioNumPackets;
+AudioStreamPacketDescription * outPacketDescriptions = (AudioStreamPacketDescription *)malloc(descSize);</p>
+
+<p>UInt32 ioNumBytes = byteCountPerPacket * ioNumPackets;
+void * outBuffer = (void *)malloc(ioNumBytes);</p>
+
+<p>OSStatus status = AudioFileReadPacketData(fileID,</p>
+
+<pre><code>                                        false, 
+                                        &amp;ioNumBytes, 
+                                        outPacketDescriptions, 
+                                        inStartingPacket, 
+                                        &amp;ioNumPackets, 
+                                        outBuffer);
+</code></pre>
+
+<p>```</p>
+
+<p>```objc
+AudioFileID fileID; //Open方法返回的AudioFileID
+UInt32 ioNumPackets = &hellip;; //要读取多少个packet
+SInt64 inStartingPacket = &hellip;; //从第几个Packet开始读取</p>
+
+<p>UInt32 maxByteCountPerPacket = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyMaximumPacketSize，最大的packet大小
+//也可以用：
+//UInt32 byteCountUpperBoundPerPacket = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyPacketSizeUpperBound，当前packet大小上界（未扫描全文件的情况下）</p>
+
+<p>UInt32 descSize = sizeof(AudioStreamPacketDescription) * ioNumPackets;
+AudioStreamPacketDescription * outPacketDescriptions = (AudioStreamPacketDescription *)malloc(descSize);</p>
+
+<p>UInt32 outNumBytes = 0；
+UInt32 ioNumBytes = maxByteCountPerPacket * ioNumPackets;
+void * outBuffer = (void *)malloc(ioNumBytes);</p>
+
+<p>OSStatus status = AudioFileReadPackets(fileID,</p>
+
+<pre><code>                                   false,
+                                   &amp;outNumBytes,
+                                   outPacketDescriptions,
+                                   inStartingPacket,
+                                   &amp;ioNumPackets,
+                                   outBuffer);
+</code></pre>
+
+<p>```</p>
+
+<hr />
+
+<h1>Seek</h1>
+
+<p>seek的思路和之前讲<code>AudioFileStream</code>时讲到的是一样的，区别在于AudioFile没有方法来帮助修正seek的offset和seek的时间：</p>
+
+<ul>
+<li>使用<code>AudioFileReadBytes</code>时需要计算出approximateSeekOffset</li>
+<li>使用<code>AudioFileReadPacketData</code>或者<code>AudioFileReadPackets</code>时需要计算出seekToPacket</li>
+</ul>
+
+
+<p>approximateSeekOffset和seekToPacket的计算方法参见<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>。</p>
+
+<hr />
+
+<h1>关闭AudioFile</h1>
+
+<p><code>AudioFile</code>使用完毕后需要调用<code>AudioFileClose</code>进行关闭，没啥特别需要注意的。</p>
+
+<p><code>objc
+extern OSStatus AudioFileClose (AudioFileID inAudioFile);   
+</code></p>
+
+<hr />
+
+<h1>小结</h1>
+
+<p>本篇针对<code>AudioFile</code>的音频读取功能做了介绍，小结一下：</p>
+
+<ul>
+<li><p><code>AudioFile</code>有两个Open方法，需要针对自身的使用场景选择不同的方法；</p></li>
+<li><p><code>AudioFileOpenURL</code>用来读取本地文件</p></li>
+<li><p><code>AudioFileOpenWithCallbacks</code>的使用场景比前者要广泛，使用时需要注意<code>AudioFile_ReadProc</code>，这个回调方法在Open方法本身和Read方法被调用时会被<code>同步</code>调用</p></li>
+<li><p>必须保证音频文件格式信息可读时才能使用<code>AudioFile</code>的Open方法，AudioFile并不能独立用于音频流的读取，需要配合<code>AudioStreamFile</code>使用才能读取流（需要用<code>AudioStreamFile</code>来判断文件格式信息可读之后再调用Open方法）；</p></li>
+<li><p>使用<code>AudioFileGetProperty</code>读取格式信息时需要判断所读取的信息是否需要先调用<code>AudioFileGetPropertyInfo</code>获得数据大小后再进行读取；</p></li>
+<li><p>读取音频数据应该根据使用的场景选择不同的音频读取方法，对于不同的读取方法seek时需要计算的变量也不相同；</p></li>
+<li><p><code>AudioFile</code>使用完毕后需要调用<code>AudioFileClose</code>进行关闭；</p></li>
+</ul>
+
+
+<hr />
+
+<h1>示例代码</h1>
+
+<p>对于本地文件用AudioFile读取比较简单就不在这里提供demo了，对于流播放中的AudioFile使用推荐大家阅读豆瓣的开源播放器代码<a href="https://github.com/douban/DOUAudioStreamer">DOUAudioStreamer</a>。</p>
+
+<hr />
+
+<h1>参考资料</h1>
+
+<p><a href="https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL">Audio File Services Reference</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS音频播放 (三)：AudioFileStream]]></title>
@@ -22,7 +498,7 @@
 
 <p>本来说好是要在第三篇中讲<code>AudioFileStream</code>和<code>AudioQueue</code>，但写着写着发现光<code>AudioFileStream</code>就好多内容，最后还是决定分篇介绍，这篇先来说一下<code>AudioFileStream</code>，下一篇计划说一下和<code>AudioFileStream</code>类似的<code>AudioFile</code>，下下篇再来说<code>AudioQueue</code>。</p>
 
-<p>在本片那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
+<p>在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
 
 <hr />
 
@@ -302,9 +778,10 @@ if (status != noErr)
 
 <p>4、<code>kAudioFileStreamProperty_FormatList</code></p>
 
-<p>作用和<code>kAudioFileStreamProperty_DataFormat</code>是一样的，区别在于用这个PropertyID获取到是一个AudioStreamBasicDescription的数组，这个参数是用来支持AAC SBR这样的包含多个文件类型的银屏格式。</p>
+<p>作用和<code>kAudioFileStreamProperty_DataFormat</code>是一样的，区别在于用这个PropertyID获取到是一个AudioStreamBasicDescription的数组，这个参数是用来支持AAC SBR这样的包含多个文件类型的音频格式。由于到底有多少个format我们并不知晓，所以需要先获取一下总数据大小：</p>
 
 <p>```objc
+//获取数据大小
 Boolean outWriteable;
 UInt32 formatListSize;
 OSStatus status = AudioFileStreamGetPropertyInfo(inAudioFileStream, kAudioFileStreamProperty_FormatList, &amp;formatListSize, &amp;outWriteable);
@@ -316,7 +793,8 @@ if (status != noErr)
 
 <p>}</p>
 
-<p>AudioFormatListItem *formatList = malloc(formatListSize);
+<p>//获取formatlist
+AudioFormatListItem *formatList = malloc(formatListSize);
 OSStatus status = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_FormatList, &amp;formatListSize, formatList);
 if (status != noErr)
 {</p>
@@ -326,7 +804,8 @@ if (status != noErr)
 
 <p>}</p>
 
-<p>for (int i = 0; i * sizeof(AudioFormatListItem) &lt; formatListSize; i += sizeof(AudioFormatListItem))
+<p>//选择需要的格式
+for (int i = 0; i * sizeof(AudioFormatListItem) &lt; formatListSize; i += sizeof(AudioFormatListItem))
 {</p>
 
 <pre><code>AudioStreamBasicDescription pasbd = formatList[i].mASBD;
@@ -479,7 +958,7 @@ if (deletePackDesc)
 
 <p>}
 ```
-inPacketDescriptions这个字段为空时需要按CBR的数据处理。但其实在解析CBR数据时inPacketDescriptions一般也会有返回，因为即使是CBR数据帧的大小也不是恒定不变的，例如CBR的MP3会在每一帧的数据后放1 byte的填充位，这个填充位也并非时时刻刻存在，所以帧的大小会有1 byte的浮动。（比如采样率44.1KHZ，码率160kbps的CBR MP3文件每一帧的大小在522字节和523字节浮动。）</p>
+inPacketDescriptions这个字段为空时需要按CBR的数据处理。但其实在解析CBR数据时inPacketDescriptions一般也会有返回，因为即使是CBR数据帧的大小也不是恒定不变的，例如CBR的MP3会在每一帧的数据后放1 byte的填充位，这个填充位也并非时时刻刻存在，所以帧的大小会有1 byte的浮动。（比如采样率44.1KHZ，码率160kbps的CBR MP3文件每一帧的大小在522字节和523字节浮动。所以不能因为有inPacketDescriptions没有返回NULL而判定音频数据就是VBR编码的）。</p>
 
 <hr />
 
@@ -570,7 +1049,7 @@ extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);
 
 <ul>
 <li><p>使用<code>AudioFileStream</code>首先需要调用<code>AudioFileStreamOpen</code>，需要注意的是尽量提供inFileTypeHint参数帮助<code>AudioFileStream</code>解析数据，调用完成后记录<code>AudioFileStreamID</code>；</p></li>
-<li><p>当有数据时调用<code>AudioFileStreamParseBytes</code>进行解析，每一次解析都需要注意返回值，返回值一旦出现noErr意外的值就代表Parse出错，其中<code>kAudioFileStreamError_NotOptimized</code>代表该文件缺少头信息或者其头信息在文件尾部不适合流播放；</p></li>
+<li><p>当有数据时调用<code>AudioFileStreamParseBytes</code>进行解析，每一次解析都需要注意返回值，返回值一旦出现noErr以外的值就代表Parse出错，其中<code>kAudioFileStreamError_NotOptimized</code>代表该文件缺少头信息或者其头信息在文件尾部不适合流播放；</p></li>
 <li><p>使用<code>AudioFileStreamParseBytes</code>需要注意第四个参数在需要合适的时候传入<code>kAudioFileStreamParseFlag_Discontinuity</code>；</p></li>
 <li><p>调用<code>AudioFileStreamParseBytes</code>后会首先同步进入<code>AudioFileStream_PropertyListenerProc</code>回调来解析文件格式信息，如果回调得到<code>kAudioFileStreamProperty_ReadyToProducePackets</code>表示解析格式信息完成；</p></li>
 <li><p>解析格式信息完成后继续调用<code>AudioFileStreamParseBytes</code>会进入<code>MyAudioFileStreamPacketsCallBack</code>回调来分离音频帧，在回调中应该将分离出来的帧信息保存到自己的buffer中</p></li>
@@ -583,7 +1062,7 @@ extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);
 
 <h1>示例代码</h1>
 
-<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>这两份优秀的开源播放器都用到<code>AudioFileStream</code>大家也可以借鉴。我自己也写了一个<a href="https://github.com/msching/MCAudioFileStream">简单的AudioFileStream封装</a>。</p>
+<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>这两个优秀的开源播放器都用到<code>AudioFileStream</code>大家可以借鉴。我自己也写了一个<a href="https://github.com/msching/MCAudioFileStream">简单的AudioFileStream封装</a>。</p>
 
 <hr />
 
@@ -958,9 +1437,9 @@ extern OSStatus AudioSessionSetActiveWithFlags(Boolean active, UInt32 inFlags);<
 
 <p>好吧，上面只是吐槽一下。请无视我吧。</p>
 
-<p><strong>2014.7.14补充：</strong></p>
+<p><strong>2014.7.14补充，7.19更新：</strong></p>
 
-<p>发现即使之前已经调用过<code>AudioSessionInitialize</code>方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用<code>AudioSessionInitialize</code>方法来重新生成AudioSession。否则调用<code>AudioSessionSetActive</code>会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为"!ini"即<code>kAudioSessionNotInitialized</code>，这个情况在iOS 5.1.x上尤其频繁，iOS 7.x也偶有发生具体的原因还不知晓。</p>
+<p>发现即使之前已经调用过<code>AudioSessionInitialize</code>方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用<code>AudioSessionInitialize</code>方法来重新生成AudioSession。否则调用<code>AudioSessionSetActive</code>会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为"!ini"即<code>kAudioSessionNotInitialized</code>，这个情况在iOS 5.1.x上比较容易发生，iOS 6.x 和 7.x也偶有发生（<del>具体的原因还不知晓</del>好像和打断时直接调用<code>AudioOutputUnitStop</code>有关，又是个坑啊）。</p>
 
 <p>所以每次在调用<code>AudioSessionSetActive</code>时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。</p>
 
@@ -1216,53 +1695,6 @@ AudioSessionInterruptionType interruptionType = [notification.userInfo[MyAudioIn
 <p>接下来的步骤就是遍历UITabBarController的view上所有的subview并逐个隐藏来进行测试，幸运的是第一个就蒙对了，在我隐藏了UITabBarController的tabbar以后奇怪的帧数就不再出现了。这个现象很快让我想到了iOS 7以后苹果加入的模糊效果，这个效果在UINavigationBar、UITabBar、UIToolBar等UI控件上都有使用，下面把UITabBarController去掉，在view上直接add一个UIToolBar，发现问题同样会出现。至此基本确定是由于这个模糊效果造成的，至于为什么只会在7.1.x上出现这个问题。。可能只有苹果才知道了=。=。</p>
 
 <p>测试程序代码点<a href="https://github.com/msching/TestGPU">这里</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[iOS8beta1下WebCore可能会打断音频播放]]></title>
-    <link href="http://msching.github.io/blog/2014/06/26/audio-interrput-by-webcore-in-ios-8-beta-1/"/>
-    <updated>2014-06-26T16:09:56+08:00</updated>
-    <id>http://msching.github.io/blog/2014/06/26/audio-interrput-by-webcore-in-ios-8-beta-1</id>
-    <content type="html"><![CDATA[<h1>问题</h1>
-
-<p>前不久在QA发现一个问题，在iOS8 beta1上使用我们的app播放歌曲时进入某些内嵌的web页面（UIWebview实现）时歌曲会暂停播放，但是界面仍然显示为正在播放状态。把真机连上Xcode6调试后发现在进入部分网页时会再console上打印如下log：</p>
-
-<pre><code>AVAudioSession.mm:623: -[AVAudioSession setActive:withOptions:error:]: Deactivating an audio session that has running I/O. All I/O should be stopped or paused prior to deactivating the audio session.
-</code></pre>
-
-<p>bt后堆栈如下：</p>
-
-<p>```</p>
-
-<pre><code>frame #1: 0x299632fe libAVFAudio.dylib`-[AVAudioSession setActive:error:] + 26
-frame #2: 0x3551b92e WebCore`WebCore::AudioSession::setActive(bool) + 62
-frame #3: 0x35af2674 WebCore`WebCore::MediaSessionManager::updateSessionState() + 100
-frame #4: 0x35af03b6 WebCore`WebCore::MediaSessionManager::addSession(WebCore::MediaSession&amp;) + 74
-frame #5: 0x35af0002 WebCore`WebCore::MediaSession::MediaSession(WebCore::MediaSessionClient&amp;) + 38
-frame #6: 0x35735a20 WebCore`WebCore::HTMLMediaSession::create(WebCore::MediaSessionClient&amp;) + 20
-frame #7: 0x35724c68 WebCore`WebCore::HTMLMediaElement::HTMLMediaElement(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, bool) + 976
-frame #8: 0x3570ad24 WebCore`WebCore::HTMLAudioElement::create(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, bool) + 36
-frame #9: 0x35718184 WebCore`WebCore::audioConstructor(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, WebCore::HTMLFormElement*, bool) + 56
-frame #10: 0x3571803a WebCore`WebCore::HTMLElementFactory::createElement(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, WebCore::HTMLFormElement*, bool) + 230
-frame #11: 0x3533a26c WebCore`WebCore::HTMLDocument::createElement(WTF::AtomicString const&amp;, int&amp;) + 88
-frame #12: 0x3533a1ae WebCore`WebCore::jsDocumentPrototypeFunctionCreateElement(JSC::ExecState*) + 242
-frame #13: 0x2c1cc4d4 JavaScriptCore`llint_entry + 21380
-</code></pre>
-
-<p>```</p>
-
-<p>发现是WebCore调用了<code>AVAudioSession</code>的setActive方法，并且把active置为了NO。这个过程其实类似于音乐在播放时被其他事件打断（例如电话、siri）一样，audio会被打断，同时会发送<code>kAudioSessionBeginInterruption</code>事件通知app音频播放已经被打断，需要修正播放器和UI状态；打断结束后回发送<code>kAudioSessionEndInterruption</code>事件通知app恢复播放状态。区别在于WebCore的打断并没有任何通知，所以就导致界面上的播放状态为播放中而实际音乐却被打断。</p>
-
-<h1>适配</h1>
-
-<p>接下来就要对这个问题进行适配了：</p>
-
-<ol>
-<li>首先，联系了前段组的同事对出现问题的页面进行检查，之后被告知是某个页面的js中调用了一些播放相关的代码导致了这个问题，这些js是之前版本中使用的，现在已经被废弃但没有及时的删除。在删除这些js后，问题自然就消失了。</li>
-<li>客户端本身也应该做一些适配来防止下次再有页面出现类似问题，目前我能想到的办法是做一个<code>AVAudioSession</code>的category，method swizzle方法<code>setActive:withOptions:error:</code>在设置active值时发送通知来修改UI的状态。</li>
-</ol>
-
 ]]></content>
   </entry>
   
