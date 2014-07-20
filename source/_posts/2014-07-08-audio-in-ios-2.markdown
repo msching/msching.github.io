@@ -318,9 +318,9 @@ extern OSStatus AudioSessionSetActiveWithFlags(Boolean active, UInt32 inFlags);
 
 好吧，上面只是吐槽一下。请无视我吧。
 
-**2014.7.14补充：**
+**2014.7.14补充，7.19更新：**
 
-发现即使之前已经调用过`AudioSessionInitialize`方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用`AudioSessionInitialize`方法来重新生成AudioSession。否则调用`AudioSessionSetActive`会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为"!ini"即`kAudioSessionNotInitialized`，这个情况在iOS 5.1.x上尤其频繁，iOS 7.x也偶有发生具体的原因还不知晓。
+发现即使之前已经调用过`AudioSessionInitialize`方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用`AudioSessionInitialize`方法来重新生成AudioSession。否则调用`AudioSessionSetActive`会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为"!ini"即`kAudioSessionNotInitialized`，这个情况在iOS 5.1.x上比较容易发生，iOS 6.x 和 7.x也偶有发生（~~具体的原因还不知晓~~好像和打断时直接调用`AudioOutputUnitStop`有关，又是个坑啊）。
 
 所以每次在调用`AudioSessionSetActive`时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。
 

@@ -12,7 +12,7 @@ categories: [iOS,Audio]
 
 本来说好是要在第三篇中讲`AudioFileStream`和`AudioQueue`，但写着写着发现光`AudioFileStream`就好多内容，最后还是决定分篇介绍，这篇先来说一下`AudioFileStream`，下一篇计划说一下和`AudioFileStream`类似的`AudioFile`，下下篇再来说`AudioQueue`。
 
-在本片那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的[第一篇](blog/2014/07/07/audio-in-ios/)），具体讲到duration和seek时会再进行说明。
+在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的[第一篇](blog/2014/07/07/audio-in-ios/)），具体讲到duration和seek时会再进行说明。
 
 ----
 
@@ -261,9 +261,10 @@ if (status != noErr)
 
 4、`kAudioFileStreamProperty_FormatList`
 
-作用和`kAudioFileStreamProperty_DataFormat`是一样的，区别在于用这个PropertyID获取到是一个AudioStreamBasicDescription的数组，这个参数是用来支持AAC SBR这样的包含多个文件类型的银屏格式。
+作用和`kAudioFileStreamProperty_DataFormat`是一样的，区别在于用这个PropertyID获取到是一个AudioStreamBasicDescription的数组，这个参数是用来支持AAC SBR这样的包含多个文件类型的音频格式。由于到底有多少个format我们并不知晓，所以需要先获取一下总数据大小：
 
 ```objc
+//获取数据大小
 Boolean outWriteable;
 UInt32 formatListSize;
 OSStatus status = AudioFileStreamGetPropertyInfo(inAudioFileStream, kAudioFileStreamProperty_FormatList, &formatListSize, &outWriteable);
@@ -272,6 +273,7 @@ if (status != noErr)
     //错误处理
 }
 
+//获取formatlist
 AudioFormatListItem *formatList = malloc(formatListSize);
 OSStatus status = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_FormatList, &formatListSize, formatList);
 if (status != noErr)
@@ -279,6 +281,7 @@ if (status != noErr)
     //错误处理
 }
 
+//选择需要的格式
 for (int i = 0; i * sizeof(AudioFormatListItem) < formatListSize; i += sizeof(AudioFormatListItem))
 {
     AudioStreamBasicDescription pasbd = formatList[i].mASBD;
@@ -414,7 +417,7 @@ static void MyAudioFileStreamPacketsCallBack(void *inClientData,
     }
 }
 ```
-inPacketDescriptions这个字段为空时需要按CBR的数据处理。但其实在解析CBR数据时inPacketDescriptions一般也会有返回，因为即使是CBR数据帧的大小也不是恒定不变的，例如CBR的MP3会在每一帧的数据后放1 byte的填充位，这个填充位也并非时时刻刻存在，所以帧的大小会有1 byte的浮动。（比如采样率44.1KHZ，码率160kbps的CBR MP3文件每一帧的大小在522字节和523字节浮动。）
+inPacketDescriptions这个字段为空时需要按CBR的数据处理。但其实在解析CBR数据时inPacketDescriptions一般也会有返回，因为即使是CBR数据帧的大小也不是恒定不变的，例如CBR的MP3会在每一帧的数据后放1 byte的填充位，这个填充位也并非时时刻刻存在，所以帧的大小会有1 byte的浮动。（比如采样率44.1KHZ，码率160kbps的CBR MP3文件每一帧的大小在522字节和523字节浮动。所以不能因为有inPacketDescriptions没有返回NULL而判定音频数据就是VBR编码的）。
 
 ----
 
@@ -496,7 +499,7 @@ extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);
 
 * 使用`AudioFileStream`首先需要调用`AudioFileStreamOpen`，需要注意的是尽量提供inFileTypeHint参数帮助`AudioFileStream`解析数据，调用完成后记录`AudioFileStreamID`；
 
-* 当有数据时调用`AudioFileStreamParseBytes`进行解析，每一次解析都需要注意返回值，返回值一旦出现noErr意外的值就代表Parse出错，其中`kAudioFileStreamError_NotOptimized`代表该文件缺少头信息或者其头信息在文件尾部不适合流播放；
+* 当有数据时调用`AudioFileStreamParseBytes`进行解析，每一次解析都需要注意返回值，返回值一旦出现noErr以外的值就代表Parse出错，其中`kAudioFileStreamError_NotOptimized`代表该文件缺少头信息或者其头信息在文件尾部不适合流播放；
 
 * 使用`AudioFileStreamParseBytes`需要注意第四个参数在需要合适的时候传入`kAudioFileStreamParseFlag_Discontinuity`；
 
@@ -512,7 +515,7 @@ extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);
 
 #示例代码
 
-[AudioStreamer](https://github.com/mattgallagher/AudioStreamer)和[FreeStreamer](https://github.com/muhku/FreeStreamer)这两份优秀的开源播放器都用到`AudioFileStream`大家也可以借鉴。我自己也写了一个[简单的AudioFileStream封装](https://github.com/msching/MCAudioFileStream)。
+[AudioStreamer](https://github.com/mattgallagher/AudioStreamer)和[FreeStreamer](https://github.com/muhku/FreeStreamer)这两个优秀的开源播放器都用到`AudioFileStream`大家可以借鉴。我自己也写了一个[简单的AudioFileStream封装](https://github.com/msching/MCAudioFileStream)。
 
 ----
 
