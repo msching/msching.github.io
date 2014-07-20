@@ -416,5 +416,11 @@ extern OSStatus AudioFileClose (AudioFileID inAudioFile);
 
 ----
 
+#下篇预告
+
+下一篇将讲述如何使用`AudioQueue`。
+
+----
+
 #参考资料
 [Audio File Services Reference](https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL)
