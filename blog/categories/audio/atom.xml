@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Audio | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/audio/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-07-20T16:50:43+08:00</updated>
+  <updated>2014-07-22T12:37:57+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -1097,7 +1097,7 @@ extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);
 
 <p>本篇为《iOS音频播放》系列的第二篇。</p>
 
-<p>在实施<a href="blog/2014/07/07/audio-in-ios/">前一篇</a>中所述的7个步骤步之前还必须面对一个麻烦的问题，AudioSession。</p>
+<p>在实施<a href="blog/2014/07/07/audio-in-ios/">前一篇</a>中所述的7个步骤之前还必须面对一个麻烦的问题，AudioSession。</p>
 
 <hr />
 
