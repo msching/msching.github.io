@@ -13,7 +13,7 @@ categories: [iOS,Audio]
 
 本篇为《iOS音频播放》系列的第二篇。
 
-在实施[前一篇](blog/2014/07/07/audio-in-ios/)中所述的7个步骤步之前还必须面对一个麻烦的问题，AudioSession。
+在实施[前一篇](blog/2014/07/07/audio-in-ios/)中所述的7个步骤之前还必须面对一个麻烦的问题，AudioSession。
 
 ----
 
