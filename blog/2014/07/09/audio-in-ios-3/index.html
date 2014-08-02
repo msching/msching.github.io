@@ -399,6 +399,14 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
+<p><strong>2014.8.2 补充：</strong>
+发现在流播放的情况下，有时数据流量比较小时会出现<code>ReadyToProducePackets</code>还是没有获取到bitRate的情况，这时就需要分离一些拼音帧然后计算平均bitRate，计算公式如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">UInt32</span> <span class="n">averageBitRate</span> <span class="o">=</span> <span class="n">totalPackectByteCount</span> <span class="o">/</span> <span class="n">totalPacketCout</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
 <p>2、<code>kAudioFileStreamProperty_DataOffset</code>：</p>
 
 <p>表示音频数据在整个音频文件中的offset（因为大多数音频文件都会有一个文件头之后才使真正的音频数据），这个值在seek时会发挥比较大的作用，音频的seek并不是直接seek文件位置而seek时间（比如seek到2分10秒的位置），seek时会根据时间计算出音频数据的字节offset然后需要再加上音频数据的offset才能得到在文件中的真正offset。</p>
@@ -540,6 +548,18 @@
 </span><span class='line'><span class="p">{</span>
 </span><span class='line'>    <span class="c1">//错误处理</span>
 </span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><strong>2014.8.2 补充：</strong>
+发现在流播放的情况下，有时数据流量比较小时会出现<code>ReadyToProducePackets</code>还是没有获取到audioDataByteCount的情况，这时就需要近似计算audioDataByteCount。一般来说音频文件的总大小一定是可以得到的（利用文件系统或者Http请求中的contentLength），那么计算方法如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">UInt32</span> <span class="n">dataOffset</span> <span class="o">=</span> <span class="p">...;</span> <span class="c1">//kAudioFileStreamProperty_DataOffset</span>
+</span><span class='line'><span class="n">UInt32</span> <span class="n">fileLength</span> <span class="o">=</span> <span class="p">...;</span> <span class="c1">//音频文件大小</span>
+</span><span class='line'><span class="n">UInt32</span> <span class="n">audioDataByteCount</span> <span class="o">=</span> <span class="n">fileLength</span> <span class="o">-</span> <span class="n">dataOffset</span><span class="p">;</span>
 </span></code></pre></td></tr></table></div></figure>
 
 

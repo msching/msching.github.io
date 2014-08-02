@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-07-22T12:37:57+08:00</updated>
+  <updated>2014-08-02T14:13:17+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -733,6 +733,13 @@ if (status != noErr)
 <p>}
 ```</p>
 
+<p><strong>2014.8.2 补充：</strong>
+发现在流播放的情况下，有时数据流量比较小时会出现<code>ReadyToProducePackets</code>还是没有获取到bitRate的情况，这时就需要分离一些拼音帧然后计算平均bitRate，计算公式如下：</p>
+
+<p><code>objc
+UInt32 averageBitRate = totalPackectByteCount / totalPacketCout;
+</code></p>
+
 <p>2、<code>kAudioFileStreamProperty_DataOffset</code>：</p>
 
 <p>表示音频数据在整个音频文件中的offset（因为大多数音频文件都会有一个文件头之后才使真正的音频数据），这个值在seek时会发挥比较大的作用，音频的seek并不是直接seek文件位置而seek时间（比如seek到2分10秒的位置），seek时会根据时间计算出音频数据的字节offset然后需要再加上音频数据的offset才能得到在文件中的真正offset。
@@ -838,6 +845,15 @@ if (status != noErr)
 
 <p>}
 ```</p>
+
+<p><strong>2014.8.2 补充：</strong>
+发现在流播放的情况下，有时数据流量比较小时会出现<code>ReadyToProducePackets</code>还是没有获取到audioDataByteCount的情况，这时就需要近似计算audioDataByteCount。一般来说音频文件的总大小一定是可以得到的（利用文件系统或者Http请求中的contentLength），那么计算方法如下：</p>
+
+<p><code>objc
+UInt32 dataOffset = ...; //kAudioFileStreamProperty_DataOffset
+UInt32 fileLength = ...; //音频文件大小
+UInt32 audioDataByteCount = fileLength - dataOffset;
+</code></p>
 
 <p>5、<code>kAudioFileStreamProperty_ReadyToProducePackets</code></p>
 
@@ -1608,7 +1624,7 @@ AudioSessionInterruptionType interruptionType = [notification.userInfo[MyAudioIn
 
 <p>MP3格式中的码率（BitRate）代表了MP3数据的压缩质量，现在常用的码率有128kbit/s、160kbit/s、320kbit/s等等，这个值越高声音质量也就越高。MP3编码方式常用的有两种<a href="http://zh.wikipedia.org/wiki/%E5%9B%BA%E5%AE%9A%E7%A0%81%E7%8E%87">固定码率</a>(Constant bitrate，CBR)和<a href="http://zh.wikipedia.org/wiki/%E5%8F%AF%E5%8F%98%E7%A0%81%E7%8E%87">可变码率</a>(Variable bitrate，VBR)。</p>
 
-<p>MP3格式中的数据通常由两部分组成，一部分为<a href="http://zh.wikipedia.org/zh/ID3">ID3</a>用来存储歌名、演唱者、专辑、音轨数等信息，另一部分为音频数据。音频数据部分以帧(frame)为单位存储，每个音频都有自己的帧头，如图所示就是一个MP3文件帧结构图（图片同样来自互联网）。MP3中的每一个帧都有自己的帧头，其中存储了码率、采样率等解码必须的信息，所以每一个帧都可以独立于文件存在和播放，这个特性加上高压缩比使得MP3文件成为了音频流播放的主流格式。帧头之后存储着音频数据，这些音频数据是若干个PCM数据帧经过压缩算法压缩得到的，对CBR的MP3数据来说每个帧中包含的PCM数据帧是固定的，而VBR是可变的。</p>
+<p>MP3格式中的数据通常由两部分组成，一部分为<a href="http://zh.wikipedia.org/zh/ID3">ID3</a>用来存储歌名、演唱者、专辑、音轨数等信息，另一部分为音频数据。音频数据部分以帧(frame)为单位存储，每个音频都有自己的帧头，如图所示就是一个MP3文件帧结构图（图片同样来自互联网）。MP3中的每一个帧都有自己的帧头，其中存储了采样率等解码必须的信息，所以每一个帧都可以独立于文件存在和播放，这个特性加上高压缩比使得MP3文件成为了音频流播放的主流格式。帧头之后存储着音频数据，这些音频数据是若干个PCM数据帧经过压缩算法压缩得到的，对CBR的MP3数据来说每个帧中包含的PCM数据帧是固定的，而VBR是可变的。</p>
 
 <p><img src="/images/iOS-audio/mp3frame.jpg" alt="" /></p>
 
