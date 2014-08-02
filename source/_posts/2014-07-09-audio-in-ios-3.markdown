@@ -217,6 +217,13 @@ if (status != noErr)
 }
 ```
 
+**2014.8.2 补充：**
+发现在流播放的情况下，有时数据流量比较小时会出现`ReadyToProducePackets`还是没有获取到bitRate的情况，这时就需要分离一些拼音帧然后计算平均bitRate，计算公式如下：
+
+```objc
+UInt32 averageBitRate = totalPackectByteCount / totalPacketCout;
+```
+
 
 2、`kAudioFileStreamProperty_DataOffset`：
 
@@ -303,6 +310,16 @@ if (status != noErr)
     //错误处理
 }
 ```
+
+**2014.8.2 补充：**
+发现在流播放的情况下，有时数据流量比较小时会出现`ReadyToProducePackets`还是没有获取到audioDataByteCount的情况，这时就需要近似计算audioDataByteCount。一般来说音频文件的总大小一定是可以得到的（利用文件系统或者Http请求中的contentLength），那么计算方法如下：
+
+```objc
+UInt32 dataOffset = ...; //kAudioFileStreamProperty_DataOffset
+UInt32 fileLength = ...; //音频文件大小
+UInt32 audioDataByteCount = fileLength - dataOffset;
+```
+
 
 5、`kAudioFileStreamProperty_ReadyToProducePackets`
 
