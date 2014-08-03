@@ -83,7 +83,7 @@ enum {
 
 第五个参数是返回的AudioFileStream实例对应的`AudioFileStreamID`，这个ID需要保存起来作为后续一些方法的参数使用；
 
-返回值用来判断是否成功初始化（OSSStatus == noErr）。
+返回值用来判断是否成功初始化（OSStatus == noErr）。
 
 ----
 
