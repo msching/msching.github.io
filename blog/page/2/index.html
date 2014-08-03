@@ -7,7 +7,7 @@
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="Apr 11th, 2014 Octopress, Other 基于Github和Octopress搭建属于自己的博客 前言 从小我就相信“好记性不如烂笔头”这句谚语，所以搭Blog想法在我的脑海中已经酝酿了很久。刚工作那会就想利用Blog来记录工作中所积累的知识，对此我也进行了一些尝试， &hellip;">
+	<meta name="description" content="May 4th, 2014 ASIHTTPRequest, iOS ASIHTTPRequest iOS7下内存泄漏问题解决记录 这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。 &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,237 @@
 			<div class="mid-col-container">
 				<div id="content" class="inner">
 <div itemscope itemtype="http://schema.org/Blog">
+
+
+    <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-05-04T14:43:40+08:00" data-updated="true" itemprop="datePublished">May 4<span>th</span>, 2014</time></div>
+		<div class="tags">
+
+
+	<a class='category' href='/blog/categories/asihttprequest/'>ASIHTTPRequest</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>
+
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name"><a href="/blog/2014/05/04/leak-of-asihttprequest-on-ios7/" itemprop="url">ASIHTTPRequest iOS7下内存泄漏问题解决记录</a></h1>
+	<div class="entry-content" itemprop="articleBody">
+		<hr />
+
+<h3>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</h3>
+
+<h3>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</h3>
+
+<hr />
+
+<h1>发现问题</h1>
+
+<p>iOS7发布后，我们对产品进行了iOS7的适配。适配完成之后的某天，我使用Leaks对产品的新版本进行内存泄漏检测时发现ASIHTTPRequest存在内存泄漏问题，当时使用的设备是iTouch5，系统为iOS7.0.2。</p>
+
+<p><strong>Leaks检测结果</strong></p>
+
+<p><img src="http://ww3.sinaimg.cn/large/7d97a68cgw1eb8uxr5ui3j20sl068acm.jpg" alt="Leaks" /></p>
+
+<p>(ps:使用的是ASIHTTPRequest iPhoneSample的检测图，结果是一样的)</p>
+
+<p>发现之初，我以为是某处ASIHTTPRequest使用不当导致的泄漏，于是把leaks中的堆栈全部都检查了一边，但没有发现任何产品工程中的代码（其中一处泄漏的堆栈如图）。</p>
+
+<p><strong>Leaks中StackTrace结果</strong></p>
+
+<p><img src="http://ww2.sinaimg.cn/large/7d97a68cgw1eb8uxtkz79j209s0gnmz2.jpg" alt="StackTrace" /></p>
+
+<p>由于在iOS7发布之前的所有版本中并未看到类似的内存泄漏，所以我就开始怀疑是ASIHTTPRequest在iOS7才产生的。于是我在iOS5和iOS6的设备上进行了Leak Profile，结果没有发现任何泄漏。</p>
+
+<p>对于这样的结果我仍然不是很确信，因为项目的需要我们对ASIHTTPRequest进行了一定的定制，修改了其中一部分代码。为了确定问题确实是出在ASIHTTPRequest上，我去github上翻出了ASIHTTPRequest的repo，pull了最新的代码，用Leaks在iOS7系统上进行了profile。在profile过程中我对iPhone Sample中的每个Tab以此进行了测试，结果在<strong>Synchronous</strong>和<strong>Queue</strong>上并没有发现内存泄漏，在<strong>Upload</strong>上发现了和之前一样泄漏。随后在iOS5和iOS6上也进行了一样的测试，结果依然是没有任何泄漏。</p>
+
+<p>自此确定了这是ASIHTTPRequest在iOS7下特有的内存泄漏，并且只会出现在有POST body的情况下。</p>
+
+<hr />
+
+<h1>寻找解答</h1>
+
+<p>发现问题之后，我仔细查看了Leaks Profile的结果，发现泄漏集中在<code>ASIInputStream</code>上，应该是在使用的过程中<code>release</code>方法在某种情况下没有被调用到。于是我重写了ASIIputStream的release方法并在其中断点，分别在iOS7和iOS6进行调试后发现iOS7比iOS6少了一次Release的调用，堆栈如图所示。</p>
+
+<p><strong>缺少的Release的断点Stack Trace结果</strong></p>
+
+<p><img src="http://ww3.sinaimg.cn/large/7d97a68cgw1eb8uxssluaj20dd0bsab3.jpg" alt="Release" /></p>
+
+<p>从堆栈来看似乎是 <code>CoreReadStreamFromCFReadStream</code> 这个类的析构函数在iOS7下没有被调用到。当时就感觉没救了，这是私有类，想要强行触发析构似乎是不可能的，能做的就是尽量减少其中的泄漏。于是我们做了如下修改：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">close</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">stream</span> <span class="n">close</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">stream</span> <span class="n">release</span><span class="p">];</span>
+</span><span class='line'>    <span class="n">stream</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改了<code>ASIInputStream</code>的<code>close</code>方法，在close完成后把其中的<code>NSInputStream</code>对象release掉，以减少内存泄漏，同时保证ASIHTTPRequest不被重复使用（因为其中的NSInputStream已经被release了无法再使用）。</p>
+
+<p>这样一来泄漏有了一定的减少，如图。</p>
+
+<p><strong>修改后的Leaks检测结果</strong></p>
+
+<p><img src="http://ww2.sinaimg.cn/large/7d97a68cgw1eb8uxs8d4kj20su023q3r.jpg" alt="Leakss" /></p>
+
+<p>但这样并不能真正解决问题，泄漏依然存在，但我一时也想不到很好的办法，于是只能给repo发issue期望能够得到原作者的回复（虽然我知道希望不大，这哥们很久没管这事了- -）。
+这是我发的issue：<a href="https://github.com/pokeb/asi-http-request/issues/378">https://github.com/pokeb/asi-http-request/issues/378</a></p>
+
+<hr />
+
+<h1>解决问题</h1>
+
+<p>发issue大约一周后的某一天收到github的邮件，说有人回复我的issue了，进去一看有一个好心人这样解答道：</p>
+
+<pre><code>@mjohnson12
+
+The leak is because ASIInputStream is being cast to a CFReadStreamRef but ASIInputStream does not derive from NSInputStream it just wraps it.
+
+My Solution is to get rid of ASIInputStream and create a NSInputStream instead in the ASIHTTPRequest startRequest: method.
+
+It breaks using the metrics that ASIInputStream records but I wasn't using them.
+
+I'm using a fairly old version of ASIHTTPRequest v.1.6.2 so your milage may vary.
+</code></pre>
+
+<p>于是我按照他的做法，把ASIHTTPRequest里的<code>ASIInputStream</code>全部替换成了<code>NSInputStream</code>，再用Leaks Profile的时候泄漏果真消失了。也正如这位仁兄所说的，<code>ASIInputStream</code>只是把自己伪装成一个<code>NSInputStream</code>，并且实现了一些<code>NSInputStream</code>的接口，实际都是由其中包含的<code>NSInputStream</code>实例完成的。<code>ASIInputStream</code>这个类的功能主要是用来做流量限制，如果不需要这个功能的话，直接把<code>ASIInputStream</code>替换成<code>NSInputStream</code>即可解决问题。</p>
+
+<p>那么如果我把<code>ASIInputStream</code>继承自<code>NSInputStream</code>的话是不是就能既保留流量限制功能又解决泄漏问题了呢？于是我开始尝试继承<code>NSInputStream</code>，其中碰到了一些困难。NSInputStream的init方法都是写在一个Category里的，无法被继承- -！。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="k">@interface</span> <span class="nc">NSInputStream</span> <span class="nl">(NSInputStreamExtensions)</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithData:</span><span class="p">(</span><span class="n">NSData</span> <span class="o">*</span><span class="p">)</span><span class="nv">data</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithFileAtPath:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">path</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="n">NS_AVAILABLE</span><span class="p">(</span><span class="mi">10</span><span class="n">_6</span><span class="p">,</span> <span class="mi">4</span><span class="n">_0</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">inputStreamWithData:</span><span class="p">(</span><span class="n">NSData</span> <span class="o">*</span><span class="p">)</span><span class="nv">data</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">inputStreamWithFileAtPath:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">path</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">inputStreamWithURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="n">NS_AVAILABLE</span><span class="p">(</span><span class="mi">10</span><span class="n">_6</span><span class="p">,</span> <span class="mi">4</span><span class="n">_0</span><span class="p">);</span>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>经过一番google我在git上发现了一个repo：<a href="https://github.com/bjhomer/HSCountingInputStream">https://github.com/bjhomer/HSCountingInputStream</a></p>
+
+<p>这个repo中实现了对于<code>NSInputStream</code>的继承。仔细阅读完成后发现其实所谓的继承也只不过时在类的@interface中声明了一下继承自<code>NSInputStream</code>而已，实际的工作还是由类中的一个<code>NSInputStream</code>实例完成的，但相比于<code>ASIInputStream</code>这个repo里的实现多了几个方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="c1">//私有的CFRunLoopRef schedule、unschedule方法</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">_scheduleInCFRunLoop:</span><span class="p">(</span><span class="n">CFRunLoopRef</span><span class="p">)</span><span class="nv">aRunLoop</span> <span class="nf">forMode:</span><span class="p">(</span><span class="n">CFStringRef</span><span class="p">)</span><span class="nv">aMode</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">_setCFClientFlags:</span><span class="p">(</span><span class="n">CFOptionFlags</span><span class="p">)</span><span class="nv">inFlags</span>
+</span><span class='line'>                 <span class="nf">callback:</span><span class="p">(</span><span class="n">CFReadStreamClientCallBack</span><span class="p">)</span><span class="nv">inCallback</span>
+</span><span class='line'>                  <span class="nf">context:</span><span class="p">(</span><span class="n">CFStreamClientContext</span> <span class="o">*</span><span class="p">)</span><span class="nv">inContext</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">_unscheduleFromCFRunLoop:</span><span class="p">(</span><span class="n">CFRunLoopRef</span><span class="p">)</span><span class="nv">aRunLoop</span> <span class="nf">forMode:</span><span class="p">(</span><span class="n">CFStringRef</span><span class="p">)</span><span class="nv">aMode</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//NSInputStream的代理方法</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">stream:</span><span class="p">(</span><span class="n">NSStream</span> <span class="o">*</span><span class="p">)</span><span class="nv">aStream</span> <span class="nf">handleEvent:</span><span class="p">(</span><span class="n">NSStreamEvent</span><span class="p">)</span><span class="nv">eventCode</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这些方法的作用大家可以参考链接：<a href="http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/">http://blog.octiplex.com/2011/06/how-to-implement-a-corefoundation-toll-free-bridged-nsinputstream-subclass/</a>。</p>
+
+<p>简单的说就是<code>NSInputStream</code>需要同时支持<code>NSRunLoop</code>和<code>CFRunLoopRef</code>的schedule和unschedule方法，那几个私有方法就是负责<code>CFRunLoopRef</code>的schedule，NSInputStream的代理方法则是负责事件的传递。这使我联想到了之前提到的没有被调用的<code>release</code>方法，iOS6下它的堆栈中正好有<code>CFRunLoopRef</code>的一些方法。莫非这就是<code>ASIInputStream</code>内存泄漏的原因所在？</p>
+
+<p>我当时的猜测是，iOS7下的内存泄漏是<code>ASIInputStream</code>伪装的不够像而导致的，之所以这么认为因为虽然有泄漏但<code>ASIInputStream</code>的功能依然存在，HTTP请求并未因此失效，这说明<code>ASIInputStream</code>还是被bridge成了<code>CFReadStream</code>，但只是因为少了和<code>NSInputStream</code>一样的unschedule方法导致其没有被正常unschedule。如果我把<code>ASIInputStream</code>的unschedule方法补上是否就可以解决问题？</p>
+
+<p>我把上述的几个方法在<code>ASIInputStream</code>中实现了以后再进行Leaks Profile，内存泄漏果然如预期的那样消失了！在<code>ASIInputStream</code>的<code>release</code>方法中打断点后发现也能够正常调用了。问题到这里算是解决了。接下来要解决这些私有方法调用可能会碰到的审核不通过问题，正好上面那篇文章里提供了思路，用runtime把三个私有方法重定向到自定义的方法上（方法名只是把&#8221;_&ldquo;去掉了）。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class='objective-c'><span class='line'><span class="k">+</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span> <span class="nf">resolveInstanceMethod:</span><span class="p">(</span><span class="kt">SEL</span><span class="p">)</span> <span class="n">selector</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">NSString</span> <span class="o">*</span> <span class="n">name</span> <span class="o">=</span> <span class="n">NSStringFromSelector</span><span class="p">(</span><span class="n">selector</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span> <span class="p">[</span><span class="n">name</span> <span class="nl">hasPrefix:</span><span class="s">@&quot;_&quot;</span><span class="p">]</span> <span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">name</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="nl">substringFromIndex:</span><span class="mi">1</span><span class="p">];</span>
+</span><span class='line'>        <span class="kt">SEL</span> <span class="n">aSelector</span> <span class="o">=</span> <span class="n">NSSelectorFromString</span><span class="p">(</span><span class="n">name</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">Method</span> <span class="n">method</span> <span class="o">=</span> <span class="n">class_getInstanceMethod</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="n">aSelector</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span> <span class="n">method</span> <span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">class_addMethod</span><span class="p">(</span><span class="n">self</span><span class="p">,</span>
+</span><span class='line'>                            <span class="n">selector</span><span class="p">,</span>
+</span><span class='line'>                            <span class="n">method_getImplementation</span><span class="p">(</span><span class="n">method</span><span class="p">),</span>
+</span><span class='line'>                            <span class="n">method_getTypeEncoding</span><span class="p">(</span><span class="n">method</span><span class="p">));</span>
+</span><span class='line'>            <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">return</span> <span class="p">[</span><span class="n">super</span> <span class="nl">resolveInstanceMethod:</span><span class="n">selector</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>至此大功告成，问题顺利解决。但这个问题之所以会出现的真正缘由我还是没有弄清楚，Apple在iOS7下究竟做了什么，哪位大神如果知道的话还请告知。。感激不尽 ~_~。</p>
+
+<p>附上修改过后的<code>ASIInputStream</code><a href="https://github.com/OpenFibers/asi-http-request/commit/499a3be1f92d7023e2d2092197dbb71c77cdd330">代码</a></p>
+
+<hr />
+
+<h1>后记</h1>
+
+<p>问题没解决的时候其他同事建议我更换成AFNetworking等等其他开源库，因为这些库更新快文档全，ASIHTTPRequest接口复杂、代码繁多而且如今已年久失修无人维护了。确实如此，但由于一些项目上的原因我们无法更换，况且ASIHTTRequest在效率上略好，并且拥有其他基于NSURLConnection的库不具备一些功能。在解决问题的过程中也让我对NSInputStream的工作机制有了更深的理解，可谓一石二鸟。由于鄙人能力有限，其中一些地方可能说的有错误或者有纰漏的话还请大神们指正:)</p>
+
+		
+		
+	</div>
+
+</article>
 
 
     <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">

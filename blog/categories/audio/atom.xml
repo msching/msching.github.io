@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Audio | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/audio/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-08-02T14:13:17+08:00</updated>
+  <updated>2014-08-03T17:17:31+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,376 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[iOS音频播放 (五)：AudioQueue]]></title>
+    <link href="http://msching.github.io/blog/2014/08/02/audio-in-ios-5/"/>
+    <updated>2014-08-02T14:21:13+08:00</updated>
+    <id>http://msching.github.io/blog/2014/08/02/audio-in-ios-5</id>
+    <content type="html"><![CDATA[<h1>前言</h1>
+
+<p>在<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>和<a href="/blog/2014/07/19/audio-in-ios-4/">第四篇</a>中介绍了如何用<code>AudioStreamFile</code>和<code>AudioFile</code>解析音频数据格式、分离音频帧。下一步终于可以使用分离出来的音频帧进行播放了，本片中将来讲一讲如何使用<code>AudioQueue</code>播放音频数据。</p>
+
+<hr />
+
+<h1>AudioQueue介绍</h1>
+
+<p><code>AudioQueue</code>是<code>AudioToolBox.framework</code>中的一员，在<a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/AudioQueueProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40005343">官方文档</a>中Apple这样描述<code>AudioQueue</code>的：</p>
+
+<p><code>Audio Queue Services provides a straightforward, low overhead way to record and play audio in iOS and Mac OS X. It is the recommended technology to use for adding basic recording or playback features to your iOS or Mac OS X application.</code></p>
+
+<p>在文档中Apple推荐开发者使用<code>AudioQueue</code>来实现app中的播放和录音功能。这里我们会针对播放功能进行介绍。</p>
+
+<p>对于支持的数据格式，Apple这样说：</p>
+
+<pre><code>Audio Queue Services lets you record and play audio in any of the following formats:
+
+* Linear PCM.
+* Any compressed format supported natively on the Apple platform you are developing for.
+* Any other format for which a user has an installed codec.
+</code></pre>
+
+<p>它支持<code>PCM</code>数据、iOS/MacOSX平台支持的压缩格式（MP3、AAC等）、其他用户可以自行提供解码器的音频数据（对于这一条，我的理解就是把音频格式自行解码成PCM数据后再给AudioQueue播放  ）。</p>
+
+<hr />
+
+<h1>AudioQueue的工作模式</h1>
+
+<p>在使用<code>AudioQueue</code>之前首先必须理解其工作模式，它之所以这么命名是因为在其内部有一套缓冲队列（Buffer Queue）的机制。在<code>AudioQueue</code>启动之后需要通过<code>AudioQueueAllocateBuffer</code>生成若干个<code>AudioQueueBufferRef</code>结构，这些Buffer将用来存储即将要播放的音频数据，并且这些Buffer是受生成他们的<code>AudioQueue</code>实例管理的，内存空间也已经被分配（按照Allocate方法的参数），当<code>AudioQueue</code>被Dispose时这些Buffer也会随之被销毁。</p>
+
+<p>当有音频数据需要被播放时首先需要被memcpy到<code>AudioQueueBufferRef</code>的mAudioData中（mAudioData所指向的内存已经被分配，之前<code>AudioQueueAllocateBuffer</code>所做的工作），并给mAudioDataByteSize字段赋值传入的数据大小。完成之后需要调用<code>AudioQueueEnqueueBuffer</code>把存有音频数据的Buffer插入到<code>AudioQueue</code>内置的Buffer队列中。在Buffer队列中有buffer存在的情况下调用<code>AudioQueueStart</code>，此时<code>AudioQueue</code>就回按照Enqueue顺序逐个使用Buffer队列中的buffer进行播放，每当一个Buffer使用完毕之后就会从Buffer队列中被移除并且在使用者指定的RunLoop上触发一个回调来告诉使用者，某个<code>AudioQueueBufferRef</code>对象已经使用完成，你可以继续重用这个对象来存储后面的音频数据。如此循环往复音频数据就会被逐个播放直到结束。</p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/AudioQueueProgrammingGuide/AboutAudioQueues/AboutAudioQueues.html#//apple_ref/doc/uid/TP40005343-CH5-SW9">官方文档</a>给出了一副图来描述这一过程：</p>
+
+<p>其中的callback按我的理解应该是指一个音频数据装填方法，该方法可以通过之前提到的数据使用后的回调来触发。</p>
+
+<p><img src="/images/iOS-audio/audioqueuePlayback.jpg" alt="AudioQueue playback" /></p>
+
+<p>根据Apple提供的<code>AudioQueue</code>工作原理结合自己理解，可以得到其工作流程大致如下：</p>
+
+<ol>
+<li>创建<code>AudioQueue</code>，创建一个自己的buffer数组BufferArray;</li>
+<li>使用<code>AudioQueueAllocateBuffer</code>创建若干个<code>AudioQueueBufferRef</code>（一般2-3个即可），放入BufferArray；</li>
+<li>有数据时从BufferArray取出一个buffer，memcpy数据后用<code>AudioQueueEnqueueBuffer</code>方法把buffer插入<code>AudioQueue</code>中；</li>
+<li><code>AudioQueue</code>中存在Buffer后，调用<code>AudioQueueStart</code>播放。（具体等到填入多少buffer后再播放可以自己控制，只要能保证播放不间断即可）；</li>
+<li><code>AudioQueue</code>播放音乐后消耗了某个buffer，在另一个线程回调并送出该buffer，把buffer放回BufferArray供下一次使用；</li>
+<li>返回步骤3继续循环直到播放结束</li>
+</ol>
+
+
+<p>从以上步骤其实不难看出，<code>AudioQueue</code>播放的过程其实就是一个典型的<a href="http://zh.wikipedia.org/zh/%E7%94%9F%E4%BA%A7%E8%80%85%E6%B6%88%E8%B4%B9%E8%80%85%E9%97%AE%E9%A2%98">生产者消费者问题</a>。生产者是<code>AudioFileStream</code>或者<code>AudioFile</code>，它们生产处音频数据帧，放入到<code>AudioQueue</code>的buffer队列中，直到buffer填满后需要等待消费者消费；<code>AudioQueue</code>作为消费者，消费了buffer队列中的数据，并且在另一个线程回调通知数据已经被消费生产者可以继续生产。所以在实现<code>AudioQueue</code>播放音频的过程中必然会接触到一些多线程同步、信号量的使用、死锁的避免等等问题。</p>
+
+<p>了解了工作流程之后再回头来看<code>AudioQueue</code>的方法，其中大部分方法都非常好理解，部分需要稍加解释。</p>
+
+<hr />
+
+<h1>创建AudioQueue</h1>
+
+<p>使用下列方法来生成<code>AudioQueue</code>的实例
+```objc
+OSStatus AudioQueueNewOutput (const AudioStreamBasicDescription * inFormat,</p>
+
+<pre><code>                            AudioQueueOutputCallback inCallbackProc,
+                            void * inUserData,
+                            CFRunLoopRef inCallbackRunLoop,
+                            CFStringRef inCallbackRunLoopMode,
+                            UInt32 inFlags,
+                            AudioQueueRef * outAQ);
+</code></pre>
+
+<p>OSStatus AudioQueueNewOutputWithDispatchQueue(AudioQueueRef * outAQ,</p>
+
+<pre><code>                                            const AudioStreamBasicDescription * inFormat,
+                                            UInt32 inFlags,
+                                            dispatch_queue_t inCallbackDispatchQueue,
+                                            AudioQueueOutputCallbackBlock inCallbackBlock);
+</code></pre>
+
+<p>```
+先来看第一个方法：</p>
+
+<p>第一个参数表示需要播放的音频数据格式类型，是一个<code>AudioStreamBasicDescription</code>对象，是使用<code>AudioFileStream</code>或者<code>AudioFile</code>解析出来的数据格式信息；</p>
+
+<p>第二个参数<code>AudioQueueOutputCallback</code>是某块Buffer<code>被使用之后</code>的回调；</p>
+
+<p>第三个参数为上下文对象；</p>
+
+<p>第四个参数inCallbackRunLoop为<code>AudioQueueOutputCallback</code>需要在的哪个RunLoop上被回调，如果传入NULL的话就会再<code>AudioQueue</code>的内部RunLoop中被回调，所以一般传NULL就可以了；</p>
+
+<p>第五个参数inCallbackRunLoopMode为RunLoop模式，如果传入NULL就相当于<code>kCFRunLoopCommonModes</code>，也传NULL就可以了；</p>
+
+<p>第六个参数inFlags是保留字段，目前没作用，传0；</p>
+
+<p>第七个参数，返回生成的<code>AudioQueue</code>实例；</p>
+
+<p>返回值用来判断是否成功创建（OSStatus == noErr）。</p>
+
+<p>第二个方法就是把RunLoop替换成了一个dispatch queue，其余参数同相同。</p>
+
+<hr />
+
+<h1>Buffer相关的方法</h1>
+
+<h3>1. 创建Buffer</h3>
+
+<p>```objc
+OSStatus AudioQueueAllocateBuffer(AudioQueueRef inAQ,</p>
+
+<pre><code>                                UInt32 inBufferByteSize,
+                                AudioQueueBufferRef * outBuffer);
+</code></pre>
+
+<p>OSStatus AudioQueueAllocateBufferWithPacketDescriptions(AudioQueueRef inAQ,</p>
+
+<pre><code>                                                      UInt32 inBufferByteSize,
+                                                      UInt32 inNumberPacketDescriptions,
+                                                      AudioQueueBufferRef * outBuffer);
+</code></pre>
+
+<p>```</p>
+
+<p>第一个方法传入<code>AudioQueue</code>实例和Buffer大小，传出的Buffer实例；</p>
+
+<p>第二个方法可以指定生成的Buffer中PacketDescriptions的个数；</p>
+
+<h3>2. 销毁Buffer</h3>
+
+<p><code>objc
+OSStatus AudioQueueFreeBuffer(AudioQueueRef inAQ,AudioQueueBufferRef inBuffer);
+</code>
+注意这个方法一般只在需要销毁特定某个buffer时才会被用到（因为dispose方法会自动销毁所有buffer），并且这个方法<code>只能在AudioQueue不在处理数据时</code>才能使用。所以这个方法一般不太能用到。</p>
+
+<h3>3. 插入Buffer</h3>
+
+<p>```objc
+OSStatus AudioQueueEnqueueBuffer(AudioQueueRef inAQ,</p>
+
+<pre><code>                               AudioQueueBufferRef inBuffer,
+                               UInt32 inNumPacketDescs,
+                               const AudioStreamPacketDescription * inPacketDescs);
+</code></pre>
+
+<p><code>``
+Enqueue方法一共有两个，上面给出的是第一个方法，第二个方法</code>AudioQueueEnqueueBufferWithParameters`可以对Enqueue的buffer进行更多额外的操作，第二个方法我也没有细细研究，一般来说用第一个方法就能满足需求了，这里我也就只针对第一个方法进行说明：</p>
+
+<p>这个Enqueue方法需要传入<code>AudioQueue</code>实例和需要Enqueue的Buffer，对于有inNumPacketDescs和inPacketDescs则需要根据需要选择传入，文档上说这两个参数主要是在播放VBR数据时使用，但之前我们提到过即便是CBR数据AudioFileStream或者AudioFile也会给出PacketDescription所以不能如此一概而论。简单的来说就是有就传PacketDescription没有就给NULL，不必管是不是VBR。</p>
+
+<hr />
+
+<h1>播放控制</h1>
+
+<h3>1.开始播放</h3>
+
+<p><code>objc
+OSStatus AudioQueueStart(AudioQueueRef inAQ,const AudioTimeStamp * inStartTime);
+</code></p>
+
+<p>第二个参数可以用来控制播放开始的时间，一般情况下直接开始播放传入NULL即可。</p>
+
+<h3>2.解码数据</h3>
+
+<p>```objc
+OSStatus AudioQueuePrime(AudioQueueRef inAQ,</p>
+
+<pre><code>                        UInt32 inNumberOfFramesToPrepare,
+                        UInt32 * outNumberOfFramesPrepared);                                    
+</code></pre>
+
+<p>```</p>
+
+<p>这个方法并不常用，因为直接调用<code>AudioQueueStart</code>会自动开始解码（如果需要的话）。参数的作用是用来指定需要解码帧数和实际完成解码的帧数；</p>
+
+<h3>3.暂停播放</h3>
+
+<p><code>objc
+OSStatus AudioQueuePause(AudioQueueRef inAQ);
+</code></p>
+
+<p>需要注意的是这个方法一旦调用后播放就会立即暂停，这就意味着<code>AudioQueueOutputCallback</code>回调也会暂停，这时需要特别关注线程的调度以防止线程陷入无限等待。</p>
+
+<h3>4.停止播放</h3>
+
+<p><code>objc
+OSStatus AudioQueueStop(AudioQueueRef inAQ, Boolean inImmediate);
+</code></p>
+
+<p>第二个参数如果传入true的话会立即停止播放（同步），如果传入false的话<code>AudioQueue</code>会播放完已经Enqueue的所有buffer后再停止（异步）。使用时注意根据需要传入适合的参数。</p>
+
+<h3>5.Flush</h3>
+
+<p><code>objc
+OSStatus
+AudioQueueFlush(AudioQueueRef inAQ);
+</code></p>
+
+<p>调用后会播放完Enqueu的所有buffer后重置解码器状态，以防止当前的解码器状态影响到下一段音频的解码（比如切换播放的歌曲时）。如果和<code>AudioQueueStop(AQ,false)</code>一起使用并不会起效，因为Stop方法的false参数也会做同样的事情。</p>
+
+<h3>6.重置</h3>
+
+<p><code>objc
+OSStatus AudioQueueReset(AudioQueueRef inAQ);
+</code>
+重置<code>AudioQueue</code>会清除所有已经Enqueue的buffer，并触发<code>AudioQueueOutputCallback</code>,调用<code>AudioQueueStop</code>方法时同样会触发该方法。这个方法的直接调用一般在seek时使用，用来清除残留的buffer（seek时还有一种做法是先<code>AudioQueueStop</code>，等seek完成后重新start）。</p>
+
+<h3>7.获取播放时间</h3>
+
+<p>```objc
+OSStatus AudioQueueGetCurrentTime(AudioQueueRef inAQ,</p>
+
+<pre><code>                                AudioQueueTimelineRef inTimeline,
+                                AudioTimeStamp * outTimeStamp,
+                                Boolean * outTimelineDiscontinuity);
+</code></pre>
+
+<p>```</p>
+
+<p>传入的参数中，第一、第四个参数是和<code>AudioQueueTimeline</code>相关的我们这里并没有用到，传入NULL。调用后的返回<code>AudioTimeStamp</code>，从这个timestap结构可以得出播放时间，计算方法如下：</p>
+
+<p><code>objc
+AudioTimeStamp time = ...; //AudioQueueGetCurrentTime方法获取
+NSTimeInterval playedTime = time.mSampleTime / _format.mSampleRate;
+</code></p>
+
+<p>在使用这个时间获取方法时有两点必须注意：</p>
+
+<p>1、 第一个需要注意的时这个播放时间是指<code>实际播放的时间</code>和一般理解上的播放进度是有区别的。举个例子，开始播放8秒后用户操作slider把播放进度seek到了第20秒之后又播放了3秒钟，此时通常意义上播放时间应该是23秒，即播放进度；而用<code>GetCurrentTime</code>方法中获得的时间为11秒，即实际播放时间。所以每次seek时都必须保存seek的timingOffset：</p>
+
+<p>```objc
+AudioTimeStamp time = &hellip;; //AudioQueueGetCurrentTime方法获取
+NSTimeInterval playedTime = time.mSampleTime / _format.mSampleRate; //seek时的播放时间</p>
+
+<p>NSTimeInterval seekTime = &hellip;; //需要seek到哪个时间
+NSTimeInterval timingOffset = seekTime &ndash; playedTime;
+```</p>
+
+<p>seek后的播放进度需要根据timingOffset和playedTime计算：
+<code>objc
+NSTimeInterval progress = timingOffset + playedTime;
+</code></p>
+
+<p>2、 第二个需要注意的是<code>GetCurrentTime</code>方法有时候会失败，所以上次获取的播放时间最好保存起来，如果遇到调用失败，就返回上次保存的结果。</p>
+
+<hr />
+
+<h1>销毁AudioQueue</h1>
+
+<p><code>objc
+AudioQueueDispose(AudioQueueRef inAQ,  Boolean inImmediate);
+</code></p>
+
+<p>销毁的同时会清除其中所有的buffer，第二个参数的意义和用法与<code>AudioQueueStop</code>方法相同。</p>
+
+<p>这个方法使用时需要注意当<code>AudioQueueStart</code>调用之后<code>AudioQueue</code>其实还没有真正开始，期间会有一个短暂的间隙。如果在<code>AudioQueueStart</code>调用后到<code>AudioQueue</code>真正开始运作前的这段时间内调用<code>AudioQueueDispose</code>方法的话会导致程序卡死。这个问题是我在使用<a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>时发现的，在iOS 6必现（iOS 7我倒是没有测试过，当时发现问题时iOS 7还没发布），起因是由于AudioStreamer会在音频EOF时就进入Cleanup环节，Cleanup环节会flush所有数据然后调用Dispose，那么当音频文件中数据非常少时就有可能出现<code>AudioQueueStart</code>调用之时就已经EOF进入Cleanup，此时就会出现上述问题。</p>
+
+<p>要规避这个问题第一种方法是做好线程的调度，保证Dispose方法调用一定是在每一个播放RunLoop之后（即至少是一个buffer被成功播放之后）。第二种方法是监听<code>kAudioQueueProperty_IsRunning</code>属性，这个属性在<code>AudioQueue</code>真正运作起来之后会变成1，停止后会变成0，所以需要保证Start方法调用后Dispose方法一定要在<code>IsRunning</code>为1时才能被调用。</p>
+
+<hr />
+
+<h1>属性和参数</h1>
+
+<p>和其他的<code>AudioToolBox</code>类一样，<code>AudioToolBox</code>有很多参数和属性可以设置、获取、监听。以下是相关的方法，这里就不再一一赘述：</p>
+
+<p>```objc
+//参数相关方法
+AudioQueueGetParameter
+AudioQueueSetParameter</p>
+
+<p>//属性相关方法
+AudioQueueGetPropertySize
+AudioQueueGetProperty
+AudioQueueSetProperty</p>
+
+<p>//监听属性变化相关方法
+AudioQueueAddPropertyListener
+AudioQueueRemovePropertyListener
+```</p>
+
+<p>属性和参数的列表：
+```
+//属性列表
+enum { // typedef UInt32 AudioQueuePropertyID</p>
+
+<pre><code>kAudioQueueProperty_IsRunning               = 'aqrn',       // value is UInt32
+
+kAudioQueueDeviceProperty_SampleRate        = 'aqsr',       // value is Float64
+kAudioQueueDeviceProperty_NumberChannels    = 'aqdc',       // value is UInt32
+kAudioQueueProperty_CurrentDevice           = 'aqcd',       // value is CFStringRef
+
+kAudioQueueProperty_MagicCookie             = 'aqmc',       // value is void*
+kAudioQueueProperty_MaximumOutputPacketSize = 'xops',       // value is UInt32
+kAudioQueueProperty_StreamDescription       = 'aqft',       // value is AudioStreamBasicDescription
+
+kAudioQueueProperty_ChannelLayout           = 'aqcl',       // value is AudioChannelLayout
+kAudioQueueProperty_EnableLevelMetering     = 'aqme',       // value is UInt32
+kAudioQueueProperty_CurrentLevelMeter       = 'aqmv',       // value is array of AudioQueueLevelMeterState, 1 per channel
+kAudioQueueProperty_CurrentLevelMeterDB     = 'aqmd',       // value is array of AudioQueueLevelMeterState, 1 per channel
+
+kAudioQueueProperty_DecodeBufferSizeFrames  = 'dcbf',       // value is UInt32
+kAudioQueueProperty_ConverterError          = 'qcve',       // value is UInt32
+
+kAudioQueueProperty_EnableTimePitch         = 'q_tp',       // value is UInt32, 0/1
+kAudioQueueProperty_TimePitchAlgorithm      = 'qtpa',       // value is UInt32. See values below.
+kAudioQueueProperty_TimePitchBypass         = 'qtpb',       // value is UInt32, 1=bypassed
+</code></pre>
+
+<p>};</p>
+
+<p>//参数列表
+enum    // typedef UInt32 AudioQueueParameterID;
+{</p>
+
+<pre><code>kAudioQueueParam_Volume         = 1,
+kAudioQueueParam_PlayRate       = 2,
+kAudioQueueParam_Pitch          = 3,
+kAudioQueueParam_VolumeRampTime = 4,
+kAudioQueueParam_Pan            = 13
+</code></pre>
+
+<p>};
+```</p>
+
+<p>其中比较有价值的属性有<code>kAudioQueueProperty_IsRunning</code>监听它可以知道当前<code>AudioQueue</code>是否在运行，这个参数的作用在讲到<code>AudioQueueDispose</code>时已经提到过。</p>
+
+<p>比较有价值的参数有：</p>
+
+<ul>
+<li><code>kAudioQueueParam_Volume</code>，它可以用来调节<code>AudioQueue</code>的播放音量，注意这个音量是<code>AudioQueue</code>的内部播放音量和系统音量相互独立设置并且最后叠加生效。</li>
+<li><code>kAudioQueueParam_VolumeRampTime</code>参数和<code>Volume</code>参数配合使用可以实现音频播放淡入淡出的效果；</li>
+<li><code>kAudioQueueParam_PlayRate</code>参数可以调整播放速率；</li>
+</ul>
+
+
+<hr />
+
+<h1>后记</h1>
+
+<p>至此本片关于<code>AudioQueue</code>的话题接结束了。使用上面提到的方法已经可以满足大部分的播放需求，但<code>AudioQueue</code>的功能远不止如此，<code>AudioQueueTimeline</code>、<code>Offline Rendering</code>、<code>AudioQueueProcessingTap</code>等功能我目前也尚未涉及和研究，未来也许还会有更多新的功能加入，学无止境啊。</p>
+
+<p>另外由于<code>AudioQueue</code>的相关内容无法单独做Demo进行展示，于是我提前把后一篇内容的<a href="https://github.com/msching/MCSimpleAudioPlayer">Demo</a>（一个简单的本地音频播放器）先在这里给出方便大家理解<code>AudioQueue</code>。如果觉得上面提到某一部分的很难以的话理解欢迎在下面留言或者在<a href="http://weibo.com/msching">微博</a>上和我交流，除此之外还可以阅读官方文档（我一直觉得官方文档是学习的最好途径）；</p>
+
+<hr />
+
+<h1>示例代码</h1>
+
+<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>都用到了AudioQueue。</p>
+
+<hr />
+
+<h1>下篇预告</h1>
+
+<p>下一篇将讲述如何利用之前讲到的<code>AudioSession</code>、<code>AudioFileStream</code>和<code>AudioQueue</code>实现一个简单的本地文件播放器。</p>
+
+<hr />
+
+<h1>参考资料</h1>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/AudioQueueProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40005343">Audio Queue Services Programming Guide</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/AudioQueueProgrammingGuide/AboutAudioQueues/AboutAudioQueues.html#//apple_ref/doc/uid/TP40005343-CH5-SW9">About Audio Queues</a></p>
+
+<p><a href="http://zh.wikipedia.org/zh/%E7%94%9F%E4%BA%A7%E8%80%85%E6%B6%88%E8%B4%B9%E8%80%85%E9%97%AE%E9%A2%98">生产者消费者问题</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS音频播放 (四)：AudioFile]]></title>
@@ -583,7 +953,7 @@ enum {</p>
 
 <p>第五个参数是返回的AudioFileStream实例对应的<code>AudioFileStreamID</code>，这个ID需要保存起来作为后续一些方法的参数使用；</p>
 
-<p>返回值用来判断是否成功初始化（OSSStatus == noErr）。</p>
+<p>返回值用来判断是否成功初始化（OSStatus == noErr）。</p>
 
 <hr />
 
@@ -1700,53 +2070,6 @@ AudioSessionInterruptionType interruptionType = [notification.userInfo[MyAudioIn
 <p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/CoreAudioEssentials/CoreAudioEssentials.html#//apple_ref/doc/uid/TP40003577-CH10-SW1">Core Audio Essential</a></p>
 
 <p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/ARoadmaptoCommonTasks/ARoadmaptoCommonTasks.html#//apple_ref/doc/uid/TP40003577-CH6-SW1">Common Tasks in OS X</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[iOS8beta1下WebCore可能会打断音频播放]]></title>
-    <link href="http://msching.github.io/blog/2014/06/26/audio-interrput-by-webcore-in-ios-8-beta-1/"/>
-    <updated>2014-06-26T16:09:56+08:00</updated>
-    <id>http://msching.github.io/blog/2014/06/26/audio-interrput-by-webcore-in-ios-8-beta-1</id>
-    <content type="html"><![CDATA[<h1>问题</h1>
-
-<p>前不久在QA发现一个问题，在iOS8 beta1上使用我们的app播放歌曲时进入某些内嵌的web页面（UIWebview实现）时歌曲会暂停播放，但是界面仍然显示为正在播放状态。把真机连上Xcode6调试后发现在进入部分网页时会再console上打印如下log：</p>
-
-<pre><code>AVAudioSession.mm:623: -[AVAudioSession setActive:withOptions:error:]: Deactivating an audio session that has running I/O. All I/O should be stopped or paused prior to deactivating the audio session.
-</code></pre>
-
-<p>bt后堆栈如下：</p>
-
-<p>```</p>
-
-<pre><code>frame #1: 0x299632fe libAVFAudio.dylib`-[AVAudioSession setActive:error:] + 26
-frame #2: 0x3551b92e WebCore`WebCore::AudioSession::setActive(bool) + 62
-frame #3: 0x35af2674 WebCore`WebCore::MediaSessionManager::updateSessionState() + 100
-frame #4: 0x35af03b6 WebCore`WebCore::MediaSessionManager::addSession(WebCore::MediaSession&amp;) + 74
-frame #5: 0x35af0002 WebCore`WebCore::MediaSession::MediaSession(WebCore::MediaSessionClient&amp;) + 38
-frame #6: 0x35735a20 WebCore`WebCore::HTMLMediaSession::create(WebCore::MediaSessionClient&amp;) + 20
-frame #7: 0x35724c68 WebCore`WebCore::HTMLMediaElement::HTMLMediaElement(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, bool) + 976
-frame #8: 0x3570ad24 WebCore`WebCore::HTMLAudioElement::create(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, bool) + 36
-frame #9: 0x35718184 WebCore`WebCore::audioConstructor(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, WebCore::HTMLFormElement*, bool) + 56
-frame #10: 0x3571803a WebCore`WebCore::HTMLElementFactory::createElement(WebCore::QualifiedName const&amp;, WebCore::Document&amp;, WebCore::HTMLFormElement*, bool) + 230
-frame #11: 0x3533a26c WebCore`WebCore::HTMLDocument::createElement(WTF::AtomicString const&amp;, int&amp;) + 88
-frame #12: 0x3533a1ae WebCore`WebCore::jsDocumentPrototypeFunctionCreateElement(JSC::ExecState*) + 242
-frame #13: 0x2c1cc4d4 JavaScriptCore`llint_entry + 21380
-</code></pre>
-
-<p>```</p>
-
-<p>发现是WebCore调用了<code>AVAudioSession</code>的setActive方法，并且把active置为了NO。这个过程其实类似于音乐在播放时被其他事件打断（例如电话、siri）一样，audio会被打断，同时会发送<code>kAudioSessionBeginInterruption</code>事件通知app音频播放已经被打断，需要修正播放器和UI状态；打断结束后回发送<code>kAudioSessionEndInterruption</code>事件通知app恢复播放状态。区别在于WebCore的打断并没有任何通知，所以就导致界面上的播放状态为播放中而实际音乐却被打断。</p>
-
-<h1>适配</h1>
-
-<p>接下来就要对这个问题进行适配了：</p>
-
-<ol>
-<li>首先，联系了前段组的同事对出现问题的页面进行检查，之后被告知是某个页面的js中调用了一些播放相关的代码导致了这个问题，这些js是之前版本中使用的，现在已经被废弃但没有及时的删除。在删除这些js后，问题自然就消失了。</li>
-<li>客户端本身也应该做一些适配来防止下次再有页面出现类似问题，目前我能想到的办法是做一个<code>AVAudioSession</code>的category，method swizzle方法<code>setActive:withOptions:error:</code>在设置active值时发送通知来修改UI的状态。</li>
-</ol>
-
 ]]></content>
   </entry>
   
