@@ -300,7 +300,10 @@ enum    // typedef UInt32 AudioQueueParameterID;
 };
 ```
 
-其中比较有价值的属性有`kAudioQueueProperty_IsRunning`监听它可以知道当前`AudioQueue`是否在运行，这个参数的作用在讲到`AudioQueueDispose`时已经提到过。
+其中比较有价值的属性有：
+
+* `kAudioQueueProperty_IsRunning`监听它可以知道当前`AudioQueue`是否在运行，这个参数的作用在讲到`AudioQueueDispose`时已经提到过。
+* `kAudioQueueProperty_MagicCookie`部分音频格式需要设置magicCookie，这个cookie可以从`AudioFileStream`和`AudioFile`中获取。
 
 比较有价值的参数有：
 
