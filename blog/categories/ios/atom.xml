@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-08-03T17:17:31+08:00</updated>
+  <updated>2014-08-04T12:26:25+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -340,7 +340,13 @@ kAudioQueueParam_Pan            = 13
 <p>};
 ```</p>
 
-<p>其中比较有价值的属性有<code>kAudioQueueProperty_IsRunning</code>监听它可以知道当前<code>AudioQueue</code>是否在运行，这个参数的作用在讲到<code>AudioQueueDispose</code>时已经提到过。</p>
+<p>其中比较有价值的属性有：</p>
+
+<ul>
+<li><code>kAudioQueueProperty_IsRunning</code>监听它可以知道当前<code>AudioQueue</code>是否在运行，这个参数的作用在讲到<code>AudioQueueDispose</code>时已经提到过。</li>
+<li><code>kAudioQueueProperty_MagicCookie</code>部分音频格式需要设置magicCookie，这个cookie可以从<code>AudioFileStream</code>和<code>AudioFile</code>中获取。</li>
+</ul>
+
 
 <p>比较有价值的参数有：</p>
 

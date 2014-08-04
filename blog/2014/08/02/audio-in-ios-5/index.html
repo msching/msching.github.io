@@ -501,7 +501,13 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>其中比较有价值的属性有<code>kAudioQueueProperty_IsRunning</code>监听它可以知道当前<code>AudioQueue</code>是否在运行，这个参数的作用在讲到<code>AudioQueueDispose</code>时已经提到过。</p>
+<p>其中比较有价值的属性有：</p>
+
+<ul>
+<li><code>kAudioQueueProperty_IsRunning</code>监听它可以知道当前<code>AudioQueue</code>是否在运行，这个参数的作用在讲到<code>AudioQueueDispose</code>时已经提到过。</li>
+<li><code>kAudioQueueProperty_MagicCookie</code>部分音频格式需要设置magicCookie，这个cookie可以从<code>AudioFileStream</code>和<code>AudioFile</code>中获取。</li>
+</ul>
+
 
 <p>比较有价值的参数有：</p>
 
