@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-08-04T12:26:25+08:00</updated>
+  <updated>2014-08-16T14:38:49+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,804 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[iOS音频播放 (六)：简单的音频播放器实现]]></title>
+    <link href="http://msching.github.io/blog/2014/08/09/audio-in-ios-6/"/>
+    <updated>2014-08-09T15:55:22+08:00</updated>
+    <id>http://msching.github.io/blog/2014/08/09/audio-in-ios-6</id>
+    <content type="html"><![CDATA[<h1>前言</h1>
+
+<p>在前几篇中我分别讲到了<code>AudioSession</code>、<code>AudioFileStream</code>、<code>AudioFile</code>、<code>AudioQueue</code>，这些类的功能已经涵盖了<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>中所提到的音频播放所需要的步骤：</p>
+
+<ol>
+<li>读取MP3文件   <code>NSFileHandle</code></li>
+<li>解析采样率、码率、时长等信息，分离MP3中的音频帧  <code>AudioFileStream</code>/<code>AudioFile</code></li>
+<li>对分离出来的音频帧解码得到PCM数据  <code>AudioQueue</code></li>
+<li><del>对PCM数据进行音效处理（均衡器、混响器等，非必须）</del>  <code>省略</code></li>
+<li>把PCM数据解码成音频信号  <code>AudioQueue</code></li>
+<li>把音频信号交给硬件播放    <code>AudioQueue</code></li>
+<li>重复1-6步直到播放完成</li>
+</ol>
+
+
+<p>下面我们就讲讲述如何用这些部件组成一个简单的<code>本地音乐播放器</code>，这里我会用到<strong>AudioSession</strong>、<strong>AudioFileStream</strong>、<strong>AudioFile</strong>、<strong>AudioQueue</strong>。</p>
+
+<p><strong>注意：在阅读本篇请实现阅读并理解前面1-5篇的内容以及2-5篇最后给出的封装类，本篇中的播放器实现将基于前面几篇中给出的<a href="https://github.com/msching/MCAudioSession">MCAudioSession</a>、<a href="https://github.com/msching/MCAudioFileStream">MCAudioFileStream</a>、<a href="https://github.com/msching/MCAudioFile">MCAudioFile</a>和<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>进行实现。</strong></p>
+
+<hr />
+
+<h1>AudioFileStream vs AudioFile</h1>
+
+<p>解释一下为什么我要同时使用<strong>AudioFileStream</strong>和<strong>AudioFile</strong>。</p>
+
+<p>第一，<code>对于网络流播必须有AudioFileStream的支持</code>，这是因为我们在<a href="/blog/2014/07/19/audio-in-ios-4/">第四篇</a>中提到过<strong>AudioFile</strong>在Open时会要求使用者提供数据，如果提供的数据不足会直接跳过并且返回错误码，而数据不足的情况在网络流中很常见，故无法使用<strong>AudioFile</strong>单独进行网络流数据的解析；</p>
+
+<p>第二，<code>对于本地音乐播放选用AudioFile更为合适</code>，原因如下：</p>
+
+<ol>
+<li><strong>AudioFileStream</strong>的主要是用在流播放中虽然不限于网络流和本地流，但流数据是按顺序提供的所以<strong>AudioFileStream</strong>也是顺序解析的，被解析的音频文件还是需要符合流播放的特性，对于不符合的本地文件<strong>AudioFileStream</strong>会在Parse时返回<code>NotOptimized</code>错误；</li>
+<li><strong>AudioFile</strong>的解析过程并不是顺序的，它会在解析时通过回调向使用者索要某个位置的数据，即使数据在文件末尾也不要紧，所以<strong>AudioFile</strong>适用于所有类型的音频文件；</li>
+</ol>
+
+
+<p>基于以上两点我们可以得出这样一个结论：<code>一款完整功能的播放器应当同时使用AudioFileStream和AudioFile</code>，用<strong>AudioFileStream</strong>来应对可以进行流播放的音频数据，以达到边播放边缓冲的最佳体验，用<strong>AudioFile</strong>来处理无法流播放的音频数据，让用户在下载完成之后仍然能够进行播放。</p>
+
+<p>本来这个Demo应该做成基于网络流的音频播放，但由于最近比较忙一直过着公司和床两点一线的生活，来不及写网络流和文件缓存的模块，所以就用本地文件代替了，所以最终在Demo会先尝试用<strong>AudioFileStream</strong>解析数据，如果失败再尝试使用<strong>AudioFile</strong>以达到模拟网络流播放的效果。</p>
+
+<hr />
+
+<h1>准备工作</h1>
+
+<p>第一件事当然是要创建一个新工程，这里我选择了的模板是SingleView，工程名我把它命名为<code>MCSimpleAudioPlayerDemo</code>：</p>
+
+<p><img src="/images/iOS-audio/createproject.jpg" alt="" /></p>
+
+<p>创建完工程之后去到Target属性的<code>Capabilities</code>选项卡设置<code>Background Modes</code>，把<code>Audio and Airplay</code>勾选，这样我们的App就可以在进入后台之后继续播放音乐了：</p>
+
+<p><img src="/images/iOS-audio/setBackgroundPlayback.jpg" alt="" /></p>
+
+<p>接下来我们需要搭建一个简单的UI，在storyboard上创建两个UIButton和一个UISlider，Button用来做播放器的播放、暂停、停止等功能控制，Slider用来显示播放进度和seek。把这些UI组件和ViewController的属性/方法关联上之后简单的UI也就完成了。</p>
+
+<p><img src="/images/iOS-audio/simpleUI.jpg" alt="" /></p>
+
+<hr />
+
+<h1>接口定义</h1>
+
+<p>下面来创建播放器类<code>MCSimpleAudioPlayer</code>，首先是初始化方法（感谢<a href="http://weibo.com/onevcat?topnav=1&amp;wvr=5&amp;topsug=1">@喵神</a>的<a href="https://github.com/onevcat/VVDocumenter-Xcode">VVDocumenter</a>）：</p>
+
+<p><code>objc
+/**
+ *  初始化方法
+ *
+ *  @param filePath 文件绝对路径
+ *  @param fileType 文件类型，作为后续创建AudioFileStream和AudioQueue的Hint使用
+ *
+ *  @return player对象
+ */
+- (instancetype)initWithFilePath:(NSString *)filePath fileType:(AudioFileTypeID)fileType;
+</code>
+另外播放器作为一个典型的状态机，各种状态也是必不可少的，这里我只简单的定义了四种状态：</p>
+
+<p>```objc
+typedef NS_ENUM(NSUInteger, MCSAPStatus)
+{</p>
+
+<pre><code>MCSAPStatusStopped = 0,
+MCSAPStatusPlaying = 1,
+MCSAPStatusWaiting = 2,
+MCSAPStatusPaused = 3,
+</code></pre>
+
+<p>};
+```</p>
+
+<p>再加上一些必不可少的属性和方法组成了<code>MCSimpleAudioPlayer.h</code></p>
+
+<p>```objc
+@interface MCSimpleAudioPlayer : NSObject</p>
+
+<p>@property (nonatomic,copy,readonly) NSString *filePath;
+@property (nonatomic,assign,readonly) AudioFileTypeID fileType;</p>
+
+<p>@property (nonatomic,readonly) MCSAPStatus status;
+@property (nonatomic,readonly) BOOL isPlayingOrWaiting;
+@property (nonatomic,assign,readonly) BOOL failed;</p>
+
+<p>@property (nonatomic,assign) NSTimeInterval progress;
+@property (nonatomic,readonly) NSTimeInterval duration;</p>
+
+<ul>
+<li><p>(instancetype)initWithFilePath:(NSString *)filePath fileType:(AudioFileTypeID)fileType;</p></li>
+<li><p>(void)play;</p></li>
+<li>(void)pause;</li>
+<li>(void)stop;
+@end
+```</li>
+</ul>
+
+
+<hr />
+
+<h1>初始化</h1>
+
+<p>在init方法中创建一个NSFileHandle的实例以用来读取数据并交给AudioFileStream解析，另外也可以根据生成的实例是否是nil来判断是否能够读取文件，如果返回的是nil就说明文件不存在或者没有权限那么播放也就无从谈起了。</p>
+
+<p><code>objc
+_fileHandler = [NSFileHandle fileHandleForReadingAtPath:_filePath];
+</code></p>
+
+<p>通过NSFileManager获取文件大小</p>
+
+<p><code>objc
+_fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:_filePath error:nil] fileSize];
+</code>
+初始化方法到这里就结束了，作为一个播放器我们自然不能在主线程进行播放，我们需要创建自己的播放线程。</p>
+
+<p>创建一个成员变量<code>_started</code>来表示播放流程是否已经开始，在<code>-play</code>方法中如果<code>_started</code>为NO就创建线程<code>_thread</code>并以<code>-threadMain</code>方法作为main，否则说明线程已经创建并且在播放流程中：</p>
+
+<p>```
+&ndash; (void)play
+{</p>
+
+<pre><code>if (!_started)
+{
+    _started = YES;
+    _thread = [[NSThread alloc] initWithTarget:self selector:@selector(threadMain) object:nil];
+    [_thread start];
+}
+else
+{
+    //如果是Pause状态就resume
+}
+</code></pre>
+
+<p>}
+<code>``
+接下来就可以在</code>-threadMain`进行音频播放相关的操作了。</p>
+
+<hr />
+
+<h1>创建AudioSession</h1>
+
+<p>iOS音频播放的第一步，自然是要创建<code>AudioSession</code>，这里引入<a href="/blog/2014/07/08/audio-in-ios-2/">第二篇</a>末尾给出的AudioSession封装<a href="https://github.com/msching/MCAudioSession">MCAudioSession</a>，当然各位也可以使用<code>AVAudioSession</code>。</p>
+
+<p>初始化的工作会在调用单例方法时进行，下一步是设置Category。</p>
+
+<p>```objc
+//初始化并且设置Category
+[[MCAudioSession sharedInstance] setCategory:kAudioSessionCategory_MediaPlayback error:NULL];</p>
+
+<p>```
+成功之后启用AudioSession，还有别忘了监听Interrupt通知。</p>
+
+<p>```objc
+if ([[MCAudioSession sharedInstance] setCategory:kAudioSessionCategory_MediaPlayback error:NULL])
+{</p>
+
+<pre><code>//active audiosession
+[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interruptHandler:) name:MCAudioSessionInterruptionNotification object:nil];
+if ([[MCAudioSession sharedInstance] setActive:YES error:NULL])
+{
+    //go on
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<hr />
+
+<h1>读取、解析音频数据</h1>
+
+<p>成功创建并启用AudioSession之后就可以进入播放流程了，播放是一个无限循环的过程，所以我们需要一个while循环，在文件没有被播放完成之前需要反复的读取、解析、播放。那么第一步是需要读取并解析数据。按照之前说的我们会先使用<code>AudioFileStream</code>，引入<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>末尾给出的AudioFileStream封装<a href="https://github.com/msching/MCAudioFileStream">MCAudioFileStream</a>。</p>
+
+<p>创建AudioFileStream，<strong>MCAudioFileStream</strong>的init方法会完成这项工作，如果创建成功就设置delegate作为Parse数据的回调。</p>
+
+<p>```objc
+<em>audioFileStream = [[MCAudioFileStream alloc] initWithFileType:</em>fileType fileSize:_fileSize error:&amp;error];
+if (!error)
+{</p>
+
+<pre><code>_audioFileStream.delegate = self;
+</code></pre>
+
+<p>}
+```</p>
+
+<p>接下来要读取数据并且解析，用成员变量<code>_offset</code>表示<code>_fileHandler</code>已经读取文件位置，其主要作用是来判断Eof。调用<strong>MCAudioFileStream</strong>的<code>-parseData:error:</code>方法来对数据进行解析。</p>
+
+<p>```objc
+NSData *data = [<em>fileHandler readDataOfLength:1000];
+</em>offset += [data length];
+if (<em>offset >= </em>fileSize)
+{</p>
+
+<pre><code>isEof = YES;
+</code></pre>
+
+<p>}
+[_audioFileStream parseData:data error:&amp;error];
+if (error)
+{</p>
+
+<pre><code>//解析失败，换用AudioFile
+</code></pre>
+
+<p>}</p>
+
+<p><code>``
+解析完文件头之后**MCAudioFileStream**的</code>readyToProducePackets<code>属性会被置为YES，此后所有的Parse方法都回触发</code>-audioFileStream:audioDataParsed:<code>方法并传递</code>MCParsedAudioData`的数组来保存解析完成的数据。这样就需要一个buffer来存储这些解析完成的音频数据。</p>
+
+<p>于是创建了<code>MCAudioBuffer</code>类来管理所有解析完成的数据：</p>
+
+<p>```objc
+@interface MCAudioBuffer : NSObject</p>
+
+<ul>
+<li><p>(instancetype)buffer;</p></li>
+<li><p>(void)enqueueData:(MCParsedAudioData *)data;</p></li>
+<li><p>(void)enqueueFromDataArray:(NSArray *)dataArray;</p></li>
+<li><p>(BOOL)hasData;</p></li>
+<li><p>(UInt32)bufferedSize;</p></li>
+<li><p>(NSData <em>)dequeueDataWithSize:(UInt32)requestSize
+                    packetCount:(UInt32 </em>)packetCount
+                   descriptions:(AudioStreamPacketDescription **)descriptions;</p></li>
+<li><p>(void)clean;
+@end</p></li>
+</ul>
+
+
+<p>```</p>
+
+<p>创建一个<strong>MCAudioBuffer</strong>的实例<code>_buffer</code>，解析完成的数据都会通过<code>enqueue</code>方法存储到<strong>_buffer</strong>中，在需要的使用可以通过<code>dequeue</code>取出来使用。</p>
+
+<p>```objc
+_buffer = [MCAudioBuffer buffer]; //初始化方法中创建</p>
+
+<p>//AudioFileStream解析完成的数据都被存储到了_buffer中
+&ndash; (void)audioFileStream:(MCAudioFileStream <em>)audioFileStream audioDataParsed:(NSArray </em>)audioData
+{</p>
+
+<pre><code>[_buffer enqueueFromDataArray:audioData];
+</code></pre>
+
+<p>}
+```</p>
+
+<p>如果遇到<strong>AudioFileStream</strong>解析失败的话，转而使用<strong>AudioFile</strong>，引入<a href="/blog/2014/07/19/audio-in-ios-4/">第四篇</a>末尾给出的AudioFile封装<a href="https://github.com/msching/MCAudioFile">MCAudioFile</a>（之前没有给出，最近补上的）。</p>
+
+<p>```objc
+_audioFileStream parseData:data error:&amp;error];
+if (error)
+{</p>
+
+<pre><code>//解析失败，换用AudioFile
+_usingAudioFile = YES;
+continue;
+</code></pre>
+
+<p>}
+```</p>
+
+<p>```objc
+if (_usingAudioFile)
+{</p>
+
+<pre><code>if (!_audioFile)
+{
+    _audioFile = [[MCAudioFile alloc] initWithFilePath:_filePath fileType:_fileType];
+}
+if ([_buffer bufferedSize] &lt; _bufferSize || !_audioQueue)
+{    
+    //AudioFile解析完成的数据都被存储到了_buffer中
+    NSArray *parsedData = [_audioFile parseData:&amp;isEof];
+    [_buffer enqueueFromDataArray:parsedData];
+}
+</code></pre>
+
+<p>}</p>
+
+<p>```</p>
+
+<p>使用<strong>AudioFile</strong>时同样需要<strong>NSFileHandle</strong>来读取文件数据，但由于其回获取数据的特性我把FileHandle的相关操作都封装进去了，所以使用<strong>MCAudioFile</strong>解析数据时直接调用Parse方法即可。</p>
+
+<hr />
+
+<h1>播放</h1>
+
+<p>有了解析完成的数据，接下来就该AudioQueue出场了，引入<a href="/blog/2014/08/02/audio-in-ios-5/">第五篇</a>末尾提到的AudioQueue的封装<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>。</p>
+
+<p>首先创建AudioQueue，由于AudioQueue需要实现创建重用buffer所以需要事先确定bufferSize，这里我设置的bufferSize是近似0.1秒的数据量，计算bufferSize需要用到的duration和audioDataByteCount可以从<strong>MCAudioFileStream</strong>或者<strong>MCAudioFile</strong>中获取。有了bufferSize之后，加上数据格式format参数和magicCookie（部分音频格式需要）就可以生成AudioQueue了。</p>
+
+<p>```objc
+&ndash; (BOOL)createAudioQueue
+{</p>
+
+<pre><code>if (_audioQueue)
+{
+    return YES;
+}
+
+NSTimeInterval duration = _usingAudioFile ? _audioFile.duration : _audioFileStream.duration;
+UInt64 audioDataByteCount = _usingAudioFile ? _audioFile.audioDataByteCount : _audioFileStream.audioDataByteCount;
+_bufferSize = 0;
+if (duration != 0)
+{
+    _bufferSize = (0.1 / duration) * audioDataByteCount;
+}
+
+if (_bufferSize &gt; 0)
+{
+    AudioStreamBasicDescription format = _usingAudioFile ? _audioFile.format : _audioFileStream.format;
+    NSData *magicCookie = _usingAudioFile ? [_audioFile fetchMagicCookie] : [_audioFileStream fetchMagicCookie];
+    _audioQueue = [[MCAudioOutputQueue alloc] initWithFormat:format bufferSize:_bufferSize macgicCookie:magicCookie];
+    if (!_audioQueue.available)
+    {
+        _audioQueue = nil;
+        return NO;
+    }
+}
+return YES;
+</code></pre>
+
+<p>}
+<code>
+接下来从**_buffer**中读出解析完成的数据，交给AudioQueue播放。如果全部播放完毕了就调用一下`-flush`让AudioQueue把剩余数据播放完毕。这里需要注意的是**MCAudioOutputQueue**的`-playData`方法在调用时如果没有可以重用的buffer的话会阻塞当前线程直到`AudioQueue`回调方法送出可重用的buffer为止。
+</code>
+UInt32 packetCount;
+AudioStreamPacketDescription <em>desces = NULL;
+NSData </em>data = [<em>buffer dequeueDataWithSize:</em>bufferSize packetCount:&amp;packetCount descriptions:&amp;desces];
+if (packetCount != 0)
+{</p>
+
+<pre><code>[_audioQueue playData:data packetCount:packetCount packetDescriptions:desces isEof:isEof];
+free(desces);
+
+if (![_buffer hasData] &amp;&amp; isEof)
+{
+    [_audioQueue flush];
+    break;
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<hr />
+
+<h1>暂停 &amp; 恢复</h1>
+
+<p>暂停方法很简单，调用<strong>MCAudioOutputQueue</strong>的<code>-pause</code>方法就可以了，但要注意的是需要和<code>-playData:</code>同步调用，否则可能引起一些问题（比如触发了pause实际由于并发操作没有真正pause住）。</p>
+
+<p>同步的方法可以采用加锁的方式，也可以通过标志位在<code>threadMain</code>中进行Pause，Demo中我使用了后者。</p>
+
+<p>```objc
+//pause方法
+&ndash; (void)pause
+{</p>
+
+<pre><code>if (self.isPlayingOrWaiting)
+{
+    _pauseRequired = YES;
+}
+</code></pre>
+
+<p>}</p>
+
+<p>//threadMain中
+&ndash; (void)threadMain
+{</p>
+
+<pre><code>...
+
+//pause
+if (_pauseRequired)
+{
+    [self setStatusInternal:MCSAPStatusPaused];
+    [_audioQueue pause];
+    [self _mutexWait];
+    _pauseRequired = NO;
+}
+
+//play
+...
+</code></pre>
+
+<p>}
+```
+在暂停后还要记得阻塞线程。</p>
+
+<p>恢复只要调用<strong>AudioQueue</strong> start方法就可以了，同时记得signal让线程继续跑</p>
+
+<p>```objc
+&ndash; (void)_resume
+{</p>
+
+<pre><code>//AudioQueue的start方法被封装到了MCAudioOutputQueue的resume方法中
+[_audioQueue resume];
+[self _mutexSignal];
+</code></pre>
+
+<p>}
+```</p>
+
+<hr />
+
+<h1>播放进度 &amp; Seek</h1>
+
+<p>对于播放进度我在<a href="/blog/2014/08/02/audio-in-ios-5/">第五篇</a>讲<strong>AudioQueue</strong>时已经提到过了，使用<code>AudioQueueGetCurrentTime</code>方法可以获取<code>实际播放的时间</code>如果Seek之后需要根据计算timingOffset，然后根据timeOffset来计算最终的播放进度：</p>
+
+<p>```objc
+&ndash; (NSTimeInterval)progress
+{</p>
+
+<pre><code>return _timingOffset + _audioQueue.playedTime;
+</code></pre>
+
+<p>}
+```
+timingOffset的计算在Seek进行，Seek操作和暂停操作一样需要和其他<strong>AudioQueue</strong>的操作同步进行，否则可能造成一些并发问题。</p>
+
+<p>```objc
+//seek方法
+&ndash; (void)setProgress:(NSTimeInterval)progress
+{</p>
+
+<pre><code>_seekRequired = YES;
+_seekTime = progress;
+</code></pre>
+
+<p>}
+```
+在seek时为了防止播放进度跳动，修改一下获取播放进度的方法：</p>
+
+<p>```objc
+&ndash; (NSTimeInterval)progress
+{</p>
+
+<pre><code>if (_seekRequired)
+{
+    return _seekTime;
+}
+return _timingOffset + _audioQueue.playedTime;
+</code></pre>
+
+<p>}
+<code>``
+下面是</code>threadMain`中的Seek操作</p>
+
+<p>```objc
+if (_seekRequired)
+{</p>
+
+<pre><code>[self setStatusInternal:MCSAPStatusWaiting];
+
+_timingOffset = _seekTime - _audioQueue.playedTime;
+[_buffer clean];
+if (_usingAudioFile)
+{
+    [_audioFile seekToTime:_seekTime];
+}
+else
+{
+    _offset = [_audioFileStream seekToTime:&amp;_seekTime];
+    [_fileHandler seekToFileOffset:_offset];
+}
+_seekRequired = NO;
+[_audioQueue reset];
+</code></pre>
+
+<p>}
+```
+Seek时需要做如下事情：</p>
+
+<ol>
+<li>计算timingOffset</li>
+<li>清除之前残余在<code>_buffer</code>中的数据</li>
+<li>挪动NSFileHandle的游标</li>
+<li>清除<strong>AudioQueue</strong>中已经Enqueue的数据</li>
+<li>如果有用到音效器的还需要清除音效器里的残余数据</li>
+</ol>
+
+
+<hr />
+
+<h1>打断</h1>
+
+<p>在接到Interrupt通知时需要处理打断，下面是打断的处理方法：</p>
+
+<p>```objc
+&ndash; (void)interruptHandler:(NSNotification *)notification
+{</p>
+
+<pre><code>UInt32 interruptionState = [notification.userInfo[MCAudioSessionInterruptionStateKey] unsignedIntValue];
+
+if (interruptionState == kAudioSessionBeginInterruption)
+{
+    _pausedByInterrupt = YES;
+    [_audioQueue pause];
+    [self setStatusInternal:MCSAPStatusPaused];
+
+}
+else if (interruptionState == kAudioSessionEndInterruption)
+{
+    AudioSessionInterruptionType interruptionType = [notification.userInfo[MCAudioSessionInterruptionTypeKey] unsignedIntValue];
+    if (interruptionType == kAudioSessionInterruptionType_ShouldResume)
+    {
+        if (self.status == MCSAPStatusPaused &amp;&amp; _pausedByInterrupt)
+        {
+            if ([[MCAudioSession sharedInstance] setActive:YES error:NULL])
+            {
+                [self play];
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>这里需要注意，打断操作我放在了主线程进行而并非放到新开的线程中进行，原因如下：</p>
+
+<ul>
+<li><p>一旦打断开始<strong>AudioSession</strong>被抢占后音频立即被打断，此时<strong>AudioQueue</strong>的所有操作会暂停，这就意味着不会有任何数据消耗回调产生；</p></li>
+<li><p>我这个Demo的线程模型中在向<strong>AudioQueue</strong> Enqueue了足够多的数据之后会阻塞当前线程等待数据消耗的回调才会signal让线程继续跑；</p></li>
+</ul>
+
+
+<p>于是就得到了这样的结论：一旦打断开始我创建的线程就会被阻塞，所以我需要在主线程来处理暂停和恢复播放。</p>
+
+<hr />
+
+<h1>停止 &amp; 清理</h1>
+
+<p>停止操作也和其他操作一样会放到<code>threadMain</code>中执行</p>
+
+<p>```objc
+&ndash; (void)stop
+{</p>
+
+<pre><code>_stopRequired = YES;
+[self _mutexSignal];
+</code></pre>
+
+<p>}</p>
+
+<p>//treadMain中
+if (_stopRequired)
+{</p>
+
+<pre><code>_stopRequired = NO;
+_started = NO;
+[_audioQueue stop:YES];
+break;
+</code></pre>
+
+<p>}
+```</p>
+
+<p>在播放被停止或者出错时会进入到清理流程，这里需要做一大堆操作，清理各种数据，关闭AudioSession，清除各种标记等等。</p>
+
+<p>```objc
+&ndash; (void)cleanup
+{</p>
+
+<pre><code>//reset file
+_offset = 0;
+[_fileHandler seekToFileOffset:0];
+
+//deactive audiosession
+[[MCAudioSession sharedInstance] setActive:NO error:NULL];
+[[NSNotificationCenter defaultCenter] removeObserver:self name:MCAudioSessionInterruptionNotification object:nil];
+
+//clean buffer
+[_buffer clean];
+
+_usingAudioFile = NO;
+//close audioFileStream
+[_audioFileStream close];
+
+//close audiofile
+[_audioFile close];
+
+//stop audioQueue
+[_audioQueue stop:YES];
+
+//destory mutex &amp; cond
+[self _mutexDestory];
+
+_started = NO;
+_timingOffset = 0;
+_seekTime = 0;
+_seekRequired = NO;
+_pauseRequired = NO;
+_stopRequired = NO;
+
+//reset status
+[self setStatusInternal:MCSAPStatusStopped];
+</code></pre>
+
+<p>}</p>
+
+<h2>```</h2>
+
+<h1>连接播放器UI</h1>
+
+<p>播放器代码完成后就需要和UI连起来让播放器跑起来了。</p>
+
+<p>在viewDidLoad时创建一个播放器：</p>
+
+<p>```objc</p>
+
+<ul>
+<li><p>(void)viewDidLoad
+{
+  [super viewDidLoad];</p>
+
+<p>  if (!<em>player)
+  {
+      NSString *path = [[NSBundle mainBundle] pathForResource:@&ldquo;MP3Sample&rdquo; ofType:@&ldquo;mp3&rdquo;];
+      </em>player = [[MCSimpleAudioPlayer alloc] initWithFilePath:path fileType:kAudioFileMP3Type];</p>
+
+<pre><code>  [_player addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:nil];
+</code></pre>
+
+<p>  }
+  [_player play];
+}
+```
+对播放器的status属性KVO用来操作播放和暂停按钮的状态以及播放进度timer的开启和暂停：</p></li>
+</ul>
+
+
+<p>```objc
+&ndash; (void)observeValueForKeyPath:(NSString <em>)keyPath ofObject:(id)object change:(NSDictionary </em>)change context:(void *)context
+{</p>
+
+<pre><code>if (object == _player)
+{
+    if ([keyPath isEqualToString:@"status"])
+    {
+        [self performSelectorOnMainThread:@selector(handleStatusChanged) withObject:nil waitUntilDone:NO];
+    }
+}
+</code></pre>
+
+<p>}</p>
+
+<ul>
+<li><p>(void)handleStatusChanged
+{
+  if (_player.isPlayingOrWaiting)
+  {
+      [self.playOrPauseButton setTitle:@&ldquo;Pause&rdquo; forState:UIControlStateNormal];
+      [self startTimer];</p>
+
+<p>  }
+  else
+  {
+      [self.playOrPauseButton setTitle:@&ldquo;Play&rdquo; forState:UIControlStateNormal];
+      [self stopTimer];
+      [self progressMove:nil];
+  }
+}</p></li>
+</ul>
+
+
+<p>```</p>
+
+<p>播放进度交给timer来刷新：</p>
+
+<p>```
+&ndash; (void)startTimer
+{</p>
+
+<pre><code>if (!_timer)
+{
+    _timer = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(progressMove:) userInfo:nil repeats:YES];
+    [_timer fire];
+}
+</code></pre>
+
+<p>}</p>
+
+<ul>
+<li><p>(void)stopTimer
+{
+  if (<em>timer)
+  {
+      [</em>timer invalidate];
+      _timer = nil;
+  }
+}</p></li>
+<li><p>(void)progressMove:(id)sender
+{
+  //在seek时不要刷新slider的thumb位置
+  if (!self.progressSlider.tracking)
+  {
+      if (<em>player.duration != 0)
+      {
+          self.progressSlider.value = </em>player.progress / _player.duration;
+      }
+      else
+      {
+          self.progressSlider.value = 0;
+      }
+  }
+}
+```</p></li>
+</ul>
+
+
+<p>监听slider的两个TouchUp时间来进行seek操作：</p>
+
+<p>```objc
+&ndash; (IBAction)seek:(id)sender
+{</p>
+
+<pre><code>_player.progress = _player.duration * self.progressSlider.value;
+</code></pre>
+
+<p>}
+```</p>
+
+<p>添加两个按钮的TouchUpInside事件进行播放控制：</p>
+
+<p>```objc
+&ndash; (IBAction)playOrPause:(id)sender
+{</p>
+
+<pre><code>if (_player.isPlayingOrWaiting)
+{
+    [_player pause];
+}
+else
+{
+    [_player play];
+}
+</code></pre>
+
+<p>}</p>
+
+<ul>
+<li>(IBAction)stop:(id)sender
+{
+  [_player stop];
+}</li>
+</ul>
+
+
+<p>```</p>
+
+<hr />
+
+<h1>进阶的内容</h1>
+
+<p>关于简单播放器的构建就讲这么多，以下是一些音频播放相关的进阶内容，由于我自己也没有摸透它们所以暂时就不做详细介绍了以免误人子弟-_-，各位有兴趣可以研究一下，如果有疑问或者有新发现欢迎大家留言或者在<a href="http://weibo.com/msching">微博</a>上和我交流共同提高~</p>
+
+<ol>
+<li><code>AudioConverter</code>可以实现音频数据的转换，在播放流程中它可以充当解码器的角色，可以把压缩的音频数据解码成为PCM数据；</li>
+<li><code>AudioUnit</code>作为比<code>AudioQueue</code>更底层的音频播放类库，Apple赋予了它更强大的功能，除了一般的播放功能之外它还能使用iPhone自带的多种均衡器对音效进行调节；</li>
+<li><code>AUGraph</code>为<code>AudioUnit</code>提供音效处理功能（这个其实我一点也没接触过0_0）</li>
+</ol>
+
+
+<hr />
+
+<h1>示例代码</h1>
+
+<p>上面所讲述的内容对应的工程已经在github上了（<a href="https://github.com/msching/MCSimpleAudioPlayer">MCSimpleAudioPlayer</a>），有任何问题可以给我发issue~</p>
+
+<hr />
+
+<h1>下篇预告</h1>
+
+<p>下一篇会介绍一下如何播放iOS系统<code>MediaLibrary</code>中的歌曲（俗称iPod音乐或者本地音乐）</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS音频播放 (五)：AudioQueue]]></title>
@@ -369,7 +1167,7 @@ kAudioQueueParam_Pan            = 13
 
 <h1>示例代码</h1>
 
-<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>都用到了AudioQueue。</p>
+<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>都用到了AudioQueue。在上面提到的Demo中也有我自己做的封装<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>。</p>
 
 <hr />
 
@@ -855,7 +1653,11 @@ extern OSStatus AudioFileClose (AudioFileID inAudioFile);
 
 <h1>示例代码</h1>
 
-<p>对于本地文件用AudioFile读取比较简单就不在这里提供demo了，对于流播放中的AudioFile使用推荐大家阅读豆瓣的开源播放器代码<a href="https://github.com/douban/DOUAudioStreamer">DOUAudioStreamer</a>。</p>
+<p><del>对于本地文件用AudioFile读取比较简单就不在这里提供demo了，</del></p>
+
+<p><a href="https://github.com/msching/MCAudioFile">简单的AudioFile封装</a>。</p>
+
+<p>对于流播放中的AudioFile使用推荐大家阅读豆瓣的开源播放器代码<a href="https://github.com/douban/DOUAudioStreamer">DOUAudioStreamer</a>。</p>
 
 <hr />
 
@@ -1969,113 +2771,6 @@ AudioSessionInterruptionType interruptionType = [notification.userInfo[MyAudioIn
 <h1>参考资料</h1>
 
 <p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40007875">AudioSession</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[iOS音频播放 (一)：概述]]></title>
-    <link href="http://msching.github.io/blog/2014/07/07/audio-in-ios/"/>
-    <updated>2014-07-07T14:40:42+08:00</updated>
-    <id>http://msching.github.io/blog/2014/07/07/audio-in-ios</id>
-    <content type="html"><![CDATA[<h1>前言</h1>
-
-<p>从事音乐相关的app开发也已经有一段时日了，在这过程中app的播放器几经修改我也因此对于iOS下的音频播放实现有了一定的研究。写这个系列的博客目的一方面希望能够抛砖引玉，另一方面也是希望能帮助国内其他的iOS开发者和爱好者少走弯路（我自己就遇到了不少的坑=。=）。</p>
-
-<p>本篇为《iOS音频播放》系列的第一篇，主要将对iOS下实现音频播放的方法进行概述。</p>
-
-<hr />
-
-<h1>基础</h1>
-
-<p>先来简单了解一下一些基础的音频知识。</p>
-
-<p>目前我们在计算机上进行音频播放都需要依赖于音频文件，音频文件的生成过程是将声音信息采样、量化和编码产生的数字信号的过程，人耳所能听到的声音，最低的频率是从20Hz起一直到最高频率20KHZ，因此音频文件格式的最大带宽是20KHZ。根据<a href="http://zh.wikipedia.org/wiki/%E5%A5%88%E5%A5%8E%E6%96%AF%E7%89%B9%E9%A2%91%E7%8E%87">奈奎斯特</a>的理论，只有采样频率高于声音信号最高频率的两倍时，才能把数字信号表示的声音还原成为原来的声音，所以音频文件的采样率一般在40~50KHZ，比如最常见的CD音质采样率44.1KHZ。</p>
-
-<p>对声音进行采样、量化过程被称为<a href="http://zh.wikipedia.org/wiki/%E8%84%88%E8%A1%9D%E7%B7%A8%E8%99%9F%E8%AA%BF%E8%AE%8A">脉冲编码调制</a>（Pulse Code Modulation），简称<code>PCM</code>。PCM数据是最原始的音频数据完全无损，所以PCM数据虽然音质优秀但体积庞大，为了解决这个问题先后诞生了一系列的音频格式，这些音频格式运用不同的方法对音频数据进行压缩，其中有无损压缩（ALAC、APE、FLAC）和有损压缩（MP3、AAC、OGG、WMA）两种。</p>
-
-<p>目前最为常用的音频格式是MP3，MP3是一种有损压缩的音频格式，设计这种格式的目的就是为了大幅度的减小音频的数据量，它舍弃PCM音频数据中人类听觉不敏感的部分，从下面的比较图我们可以明显的看到MP3数据相比PCM数据明显矮了一截（图片引自<a href="http://bbs.imp3.net/thread-243641-1-1.html">imp3论坛</a>）。</p>
-
-<p><img src="/images/iOS-audio/pcm.jpg" alt="上图为pcm数据" />
-<img src="/images/iOS-audio/mp3.jpg" alt="上图为mp3数据" /></p>
-
-<p>MP3格式中的码率（BitRate）代表了MP3数据的压缩质量，现在常用的码率有128kbit/s、160kbit/s、320kbit/s等等，这个值越高声音质量也就越高。MP3编码方式常用的有两种<a href="http://zh.wikipedia.org/wiki/%E5%9B%BA%E5%AE%9A%E7%A0%81%E7%8E%87">固定码率</a>(Constant bitrate，CBR)和<a href="http://zh.wikipedia.org/wiki/%E5%8F%AF%E5%8F%98%E7%A0%81%E7%8E%87">可变码率</a>(Variable bitrate，VBR)。</p>
-
-<p>MP3格式中的数据通常由两部分组成，一部分为<a href="http://zh.wikipedia.org/zh/ID3">ID3</a>用来存储歌名、演唱者、专辑、音轨数等信息，另一部分为音频数据。音频数据部分以帧(frame)为单位存储，每个音频都有自己的帧头，如图所示就是一个MP3文件帧结构图（图片同样来自互联网）。MP3中的每一个帧都有自己的帧头，其中存储了采样率等解码必须的信息，所以每一个帧都可以独立于文件存在和播放，这个特性加上高压缩比使得MP3文件成为了音频流播放的主流格式。帧头之后存储着音频数据，这些音频数据是若干个PCM数据帧经过压缩算法压缩得到的，对CBR的MP3数据来说每个帧中包含的PCM数据帧是固定的，而VBR是可变的。</p>
-
-<p><img src="/images/iOS-audio/mp3frame.jpg" alt="" /></p>
-
-<hr />
-
-<h1>iOS音频播放概述</h1>
-
-<p>了解了基础概念之后我们就可以列出一个经典的音频播放流程（以MP3为例）：</p>
-
-<ol>
-<li>读取MP3文件</li>
-<li>解析采样率、码率、时长等信息，分离MP3中的音频帧</li>
-<li>对分离出来的音频帧解码得到PCM数据</li>
-<li>对PCM数据进行音效处理（均衡器、混响器等，非必须）</li>
-<li>把PCM数据解码成音频信号</li>
-<li>把音频信号交给硬件播放</li>
-<li>重复1-6步直到播放完成</li>
-</ol>
-
-
-<p>在iOS系统中apple对上述的流程进行了封装并提供了不同层次的接口（图片引自<a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/CoreAudioEssentials/CoreAudioEssentials.html#//apple_ref/doc/uid/TP40003577-CH10-SW1">官方文档</a>）。</p>
-
-<p><img src="/images/iOS-audio/api-architectural-layers.png" alt="CoreAudio的接口层次" /></p>
-
-<p>下面对其中的中高层接口进行功能说明：</p>
-
-<ul>
-<li>Audio File Services：读写音频数据，可以完成播放流程中的第2步；</li>
-<li>Audio File Stream Services：对音频进行解码，可以完成播放流程中的第2步；</li>
-<li>Audio Converter services：音频数据转换，可以完成播放流程中的第3步；</li>
-<li>Audio Processing Graph Services：音效处理模块，可以完成播放流程中的第4步；</li>
-<li>Audio Unit Services：播放音频数据：可以完成播放流程中的第5步、第6步；</li>
-<li>Extended Audio File Services：Audio File Services和Audio Converter services的结合体；</li>
-<li>AVAudioPlayer/AVPlayer(AVFoundation)：高级接口，可以完成整个音频播放的过程（包括本地文件和网络流播放，第4步除外）；</li>
-<li>Audio Queue Services：高级接口，可以进行录音和播放，可以完成播放流程中的第3、5、6步；</li>
-<li>OpenAL：用于游戏音频播放，暂不讨论</li>
-</ul>
-
-
-<p>可以看到apple提供的接口类型非常丰富，可以满足各种类别类需求：</p>
-
-<ul>
-<li><p>如果你只是想实现音频的播放，没有其他需求AVFoundation会很好的满足你的需求。它的接口使用简单、不用关心其中的细节；</p></li>
-<li><p>如果你的app需要对音频进行流播放并且同时存储，那么AudioFileStreamer加AudioQueue能够帮到你，你可以先把音频数据下载到本地，一边下载一边用NSFileHandler等接口读取本地音频文件并交给AudioFileStreamer或者AudioFile解析分离音频帧，分离出来的音频帧可以送给AudioQueue进行解码和播放。如果是本地文件直接读取文件解析即可。（这两个都是比较直接的做法，这类需求也可以用AVFoundation+本地server的方式实现，AVAudioPlayer会把请求发送给本地server，由本地server转发出去，获取数据后在本地server中存储并转送给AVAudioPlayer。另一个比较trick的做法是先把音频下载到文件中，在下载到一定量的数据后把文件路径给AVAudioPlayer播放，当然这种做法在音频seek后就回有问题了。）；</p></li>
-<li><p>如果你正在开发一个专业的音乐播放软件，需要对音频施加音效（均衡器、混响器），那么除了数据的读取和解析以外还需要用到AudioConverter来把音频数据转换成PCM数据，再由AudioUnit+AUGraph来进行音效处理和播放（但目前多数带音效的app都是自己开发音效模块来坐PCM数据的处理，这部分功能自行开发在自定义性和扩展性上会比较强一些。PCM数据通过音效器处理完成后就可以使用AudioUnit播放了，当然AudioQueue也支持直接使对PCM数据进行播放。）。下图描述的就是使用AudioFile + AudioConverter + AudioUnit进行音频播放的流程（图片引自<a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/ARoadmaptoCommonTasks/ARoadmaptoCommonTasks.html#//apple_ref/doc/uid/TP40003577-CH6-SW1">官方文档</a>）。</p></li>
-</ul>
-
-
-<p><img src="/images/iOS-audio/audioUnitPlay.jpg" alt="" /></p>
-
-<hr />
-
-<h1>下篇预告</h1>
-
-<p>下一篇将讲述iOS音频播放中必须面对的难（da）题（keng），AudioSession。</p>
-
-<hr />
-
-<h1>参考资料</h1>
-
-<p><a href="http://zh.wikipedia.org/zh/%E9%9F%B3%E9%A2%91%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F">音频文件格式</a></p>
-
-<p><a href="http://zh.wikipedia.org/wiki/%E8%84%88%E8%A1%9D%E7%B7%A8%E8%99%9F%E8%AA%BF%E8%AE%8A">脉冲编码调制</a></p>
-
-<p><a href="http://zh.wikipedia.org/zh/%E9%87%87%E6%A0%B7%E7%8E%87">采样率</a></p>
-
-<p><a href="http://zh.wikipedia.org/wiki/%E5%A5%88%E5%A5%8E%E6%96%AF%E7%89%B9%E9%A2%91%E7%8E%87">奈奎斯特频率</a></p>
-
-<p><a href="http://zh.wikipedia.org/wiki/MP3">MP3</a></p>
-
-<p><a href="http://zh.wikipedia.org/zh/ID3">ID3</a></p>
-
-<p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/CoreAudioEssentials/CoreAudioEssentials.html#//apple_ref/doc/uid/TP40003577-CH10-SW1">Core Audio Essential</a></p>
-
-<p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/CoreAudioOverview/ARoadmaptoCommonTasks/ARoadmaptoCommonTasks.html#//apple_ref/doc/uid/TP40003577-CH6-SW1">Common Tasks in OS X</a></p>
 ]]></content>
   </entry>
   

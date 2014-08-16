@@ -1,0 +1,1274 @@
+
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>iOS音频播放 (六)：简单的音频播放器实现 - 码农人生</title>
+	<meta name="author" content="ChengYinZju">
+
+	
+	<meta name="description" content="Aug 9th, 2014 Audio, iOS iOS音频播放 (六)：简单的音频播放器实现 Audio Playback in iOS (Part 6) : Create a Simple Audio Player 前言 在前几篇中我分别讲到了AudioSession、 &hellip;">
+	
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<link href="/atom.xml" rel="alternate" title="码农人生" type="application/atom+xml">
+	
+	<link rel="canonical" href="http://msching.github.io/blog/2014/08/09/audio-in-ios-6/">
+	<link href="/favicon.png" rel="shortcut icon">
+	<link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+	<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+	<!--[good job! gfw]><script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><!-->
+	<script src="http://cdn.staticfile.org/jquery/1.9.1/jquery.min.js"></script>
+	<link href="/stylesheets/google-fonts.css" rel="stylesheet" type="text/css">
+	
+</head>
+
+
+<body>
+	<div class="container">
+		<div class="left-col">
+			<div class="intrude-less">
+			<header id="header" class="inner"><div class="profilepic">	
+	<script src="/javascripts/md5.js"></script>
+	<script type="text/javascript">
+		document.write("<img alt='Profile Picture' src='/images/avatar.png' style='width:160px;'/>");
+	</script>
+</div>
+<h1><a href="/">码农人生</a></h1>
+<p class="subtitle">ChengYin's coding life</p>
+<nav id="main-nav"><ul class="main">
+    <li><a href="/">主页  Blog</a></li>
+    <li><a href="/blog/categories">分类  Categories</a></li>
+    <li><a href="/blog/archives">归档  Archives</a></li>
+    <li><a href="/aboutme">关于  About</a></li>
+</ul></nav>
+<nav id="sub-nav">
+	<div class="social">
+		
+		<a class="weibo" href="http://www.weibo.com/msching" title="Weibo">Weibo</a>
+		
+		
+		
+		
+		
+		<a class="github" href="https://github.com/msching" title="GitHub">GitHub</a>
+		
+		
+		
+		
+		
+		
+		
+		<a class="rss" href="/atom.xml" title="RSS">RSS</a>
+		
+	</div>
+</nav>
+<p class="description">Where there is a will, there is a way. -- Thomas Edison</p>
+</header>				
+			</div>
+		</div>	
+		<div class="mid-col">
+			
+				
+			
+			<div class="mid-col-container">
+				<div id="content" class="inner"><article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-08-09T15:55:22+08:00" data-updated="true" itemprop="datePublished">Aug 9<span>th</span>, 2014</time></div>
+		<div class="tags">
+
+
+	<a class='category' href='/blog/categories/audio/'>Audio</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>
+
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name">iOS音频播放 (六)：简单的音频播放器实现</h1>
+	<p class="subtitle" itemprop="name">Audio Playback in iOS (Part 6) : Create a Simple Audio Player</p>
+	<hr />
+	<div class="entry-content" itemprop="articleBody"><h1>前言</h1>
+
+<p>在前几篇中我分别讲到了<code>AudioSession</code>、<code>AudioFileStream</code>、<code>AudioFile</code>、<code>AudioQueue</code>，这些类的功能已经涵盖了<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>中所提到的音频播放所需要的步骤：</p>
+
+<ol>
+<li>读取MP3文件   <code>NSFileHandle</code></li>
+<li>解析采样率、码率、时长等信息，分离MP3中的音频帧  <code>AudioFileStream</code>/<code>AudioFile</code></li>
+<li>对分离出来的音频帧解码得到PCM数据  <code>AudioQueue</code></li>
+<li><del>对PCM数据进行音效处理（均衡器、混响器等，非必须）</del>  <code>省略</code></li>
+<li>把PCM数据解码成音频信号  <code>AudioQueue</code></li>
+<li>把音频信号交给硬件播放    <code>AudioQueue</code></li>
+<li>重复1-6步直到播放完成</li>
+</ol>
+
+
+<p>下面我们就讲讲述如何用这些部件组成一个简单的<code>本地音乐播放器</code>，这里我会用到<strong>AudioSession</strong>、<strong>AudioFileStream</strong>、<strong>AudioFile</strong>、<strong>AudioQueue</strong>。</p>
+
+<p><strong>注意：在阅读本篇请实现阅读并理解前面1-5篇的内容以及2-5篇最后给出的封装类，本篇中的播放器实现将基于前面几篇中给出的<a href="https://github.com/msching/MCAudioSession">MCAudioSession</a>、<a href="https://github.com/msching/MCAudioFileStream">MCAudioFileStream</a>、<a href="https://github.com/msching/MCAudioFile">MCAudioFile</a>和<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>进行实现。</strong></p>
+
+<hr />
+
+<h1>AudioFileStream vs AudioFile</h1>
+
+<p>解释一下为什么我要同时使用<strong>AudioFileStream</strong>和<strong>AudioFile</strong>。</p>
+
+<p>第一，<code>对于网络流播必须有AudioFileStream的支持</code>，这是因为我们在<a href="/blog/2014/07/19/audio-in-ios-4/">第四篇</a>中提到过<strong>AudioFile</strong>在Open时会要求使用者提供数据，如果提供的数据不足会直接跳过并且返回错误码，而数据不足的情况在网络流中很常见，故无法使用<strong>AudioFile</strong>单独进行网络流数据的解析；</p>
+
+<p>第二，<code>对于本地音乐播放选用AudioFile更为合适</code>，原因如下：</p>
+
+<ol>
+<li><strong>AudioFileStream</strong>的主要是用在流播放中虽然不限于网络流和本地流，但流数据是按顺序提供的所以<strong>AudioFileStream</strong>也是顺序解析的，被解析的音频文件还是需要符合流播放的特性，对于不符合的本地文件<strong>AudioFileStream</strong>会在Parse时返回<code>NotOptimized</code>错误；</li>
+<li><strong>AudioFile</strong>的解析过程并不是顺序的，它会在解析时通过回调向使用者索要某个位置的数据，即使数据在文件末尾也不要紧，所以<strong>AudioFile</strong>适用于所有类型的音频文件；</li>
+</ol>
+
+
+<p>基于以上两点我们可以得出这样一个结论：<code>一款完整功能的播放器应当同时使用AudioFileStream和AudioFile</code>，用<strong>AudioFileStream</strong>来应对可以进行流播放的音频数据，以达到边播放边缓冲的最佳体验，用<strong>AudioFile</strong>来处理无法流播放的音频数据，让用户在下载完成之后仍然能够进行播放。</p>
+
+<p>本来这个Demo应该做成基于网络流的音频播放，但由于最近比较忙一直过着公司和床两点一线的生活，来不及写网络流和文件缓存的模块，所以就用本地文件代替了，所以最终在Demo会先尝试用<strong>AudioFileStream</strong>解析数据，如果失败再尝试使用<strong>AudioFile</strong>以达到模拟网络流播放的效果。</p>
+
+<hr />
+
+<h1>准备工作</h1>
+
+<p>第一件事当然是要创建一个新工程，这里我选择了的模板是SingleView，工程名我把它命名为<code>MCSimpleAudioPlayerDemo</code>：</p>
+
+<p><img src="/images/iOS-audio/createproject.jpg" alt="" /></p>
+
+<p>创建完工程之后去到Target属性的<code>Capabilities</code>选项卡设置<code>Background Modes</code>，把<code>Audio and Airplay</code>勾选，这样我们的App就可以在进入后台之后继续播放音乐了：</p>
+
+<p><img src="/images/iOS-audio/setBackgroundPlayback.jpg" alt="" /></p>
+
+<p>接下来我们需要搭建一个简单的UI，在storyboard上创建两个UIButton和一个UISlider，Button用来做播放器的播放、暂停、停止等功能控制，Slider用来显示播放进度和seek。把这些UI组件和ViewController的属性/方法关联上之后简单的UI也就完成了。</p>
+
+<p><img src="/images/iOS-audio/simpleUI.jpg" alt="" /></p>
+
+<hr />
+
+<h1>接口定义</h1>
+
+<p>下面来创建播放器类<code>MCSimpleAudioPlayer</code>，首先是初始化方法（感谢<a href="http://weibo.com/onevcat?topnav=1&amp;wvr=5&amp;topsug=1">@喵神</a>的<a href="https://github.com/onevcat/VVDocumenter-Xcode">VVDocumenter</a>）：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cm">/**</span>
+</span><span class='line'><span class="cm"> *  初始化方法</span>
+</span><span class='line'><span class="cm"> *</span>
+</span><span class='line'><span class="cm"> *  @param filePath 文件绝对路径</span>
+</span><span class='line'><span class="cm"> *  @param fileType 文件类型，作为后续创建AudioFileStream和AudioQueue的Hint使用</span>
+</span><span class='line'><span class="cm"> *</span>
+</span><span class='line'><span class="cm"> *  @return player对象</span>
+</span><span class='line'><span class="cm"> */</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">instancetype</span><span class="p">)</span><span class="nf">initWithFilePath:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">filePath</span> <span class="nf">fileType:</span><span class="p">(</span><span class="n">AudioFileTypeID</span><span class="p">)</span><span class="nv">fileType</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>另外播放器作为一个典型的状态机，各种状态也是必不可少的，这里我只简单的定义了四种状态：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">typedef</span> <span class="nf">NS_ENUM</span><span class="p">(</span><span class="n">NSUInteger</span><span class="p">,</span> <span class="n">MCSAPStatus</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">MCSAPStatusStopped</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+</span><span class='line'>    <span class="n">MCSAPStatusPlaying</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+</span><span class='line'>    <span class="n">MCSAPStatusWaiting</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+</span><span class='line'>    <span class="n">MCSAPStatusPaused</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+</span><span class='line'><span class="p">};</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>再加上一些必不可少的属性和方法组成了<code>MCSimpleAudioPlayer.h</code></p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">@interface</span> <span class="nc">MCSimpleAudioPlayer</span> : <span class="nc">NSObject</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span><span class="n">copy</span><span class="p">,</span><span class="n">readonly</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">filePath</span><span class="p">;</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span><span class="n">assign</span><span class="p">,</span><span class="n">readonly</span><span class="p">)</span> <span class="n">AudioFileTypeID</span> <span class="n">fileType</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span><span class="n">readonly</span><span class="p">)</span> <span class="n">MCSAPStatus</span> <span class="n">status</span><span class="p">;</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span><span class="n">readonly</span><span class="p">)</span> <span class="kt">BOOL</span> <span class="n">isPlayingOrWaiting</span><span class="p">;</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span><span class="n">assign</span><span class="p">,</span><span class="n">readonly</span><span class="p">)</span> <span class="kt">BOOL</span> <span class="n">failed</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span><span class="n">assign</span><span class="p">)</span> <span class="n">NSTimeInterval</span> <span class="n">progress</span><span class="p">;</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span><span class="n">readonly</span><span class="p">)</span> <span class="n">NSTimeInterval</span> <span class="n">duration</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">instancetype</span><span class="p">)</span><span class="nf">initWithFilePath:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">filePath</span> <span class="nf">fileType:</span><span class="p">(</span><span class="n">AudioFileTypeID</span><span class="p">)</span><span class="nv">fileType</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">play</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">pause</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">stop</span><span class="p">;</span>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>初始化</h1>
+
+<p>在init方法中创建一个NSFileHandle的实例以用来读取数据并交给AudioFileStream解析，另外也可以根据生成的实例是否是nil来判断是否能够读取文件，如果返回的是nil就说明文件不存在或者没有权限那么播放也就无从谈起了。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">_fileHandler</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSFileHandle</span> <span class="nl">fileHandleForReadingAtPath:</span><span class="n">_filePath</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>通过NSFileManager获取文件大小</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">_fileSize</span> <span class="o">=</span> <span class="p">[[[</span><span class="n">NSFileManager</span> <span class="n">defaultManager</span><span class="p">]</span> <span class="nl">attributesOfItemAtPath:</span><span class="n">_filePath</span> <span class="nl">error:</span><span class="nb">nil</span><span class="p">]</span> <span class="n">fileSize</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>初始化方法到这里就结束了，作为一个播放器我们自然不能在主线程进行播放，我们需要创建自己的播放线程。</p>
+
+<p>创建一个成员变量<code>_started</code>来表示播放流程是否已经开始，在<code>-play</code>方法中如果<code>_started</code>为NO就创建线程<code>_thread</code>并以<code>-threadMain</code>方法作为main，否则说明线程已经创建并且在播放流程中：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">play</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">_started</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">_started</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>        <span class="n">_thread</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSThread</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithTarget:</span><span class="n">self</span> <span class="nl">selector:</span><span class="k">@selector</span><span class="p">(</span><span class="n">threadMain</span><span class="p">)</span> <span class="nl">object:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_thread</span> <span class="n">start</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="c1">//如果是Pause状态就resume</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接下来就可以在<code>-threadMain</code>进行音频播放相关的操作了。</p>
+
+<hr />
+
+<h1>创建AudioSession</h1>
+
+<p>iOS音频播放的第一步，自然是要创建<code>AudioSession</code>，这里引入<a href="/blog/2014/07/08/audio-in-ios-2/">第二篇</a>末尾给出的AudioSession封装<a href="https://github.com/msching/MCAudioSession">MCAudioSession</a>，当然各位也可以使用<code>AVAudioSession</code>。</p>
+
+<p>初始化的工作会在调用单例方法时进行，下一步是设置Category。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//初始化并且设置Category</span>
+</span><span class='line'><span class="p">[[</span><span class="n">MCAudioSession</span> <span class="n">sharedInstance</span><span class="p">]</span> <span class="nl">setCategory:</span><span class="n">kAudioSessionCategory_MediaPlayback</span> <span class="nl">error:</span><span class="nb">NULL</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>成功之后启用AudioSession，还有别忘了监听Interrupt通知。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">if</span> <span class="p">([[</span><span class="n">MCAudioSession</span> <span class="n">sharedInstance</span><span class="p">]</span> <span class="nl">setCategory:</span><span class="n">kAudioSessionCategory_MediaPlayback</span> <span class="nl">error:</span><span class="nb">NULL</span><span class="p">])</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="c1">//active audiosession</span>
+</span><span class='line'>    <span class="p">[[</span><span class="n">NSNotificationCenter</span> <span class="n">defaultCenter</span><span class="p">]</span> <span class="nl">addObserver:</span><span class="n">self</span> <span class="nl">selector:</span><span class="k">@selector</span><span class="p">(</span><span class="nl">interruptHandler:</span><span class="p">)</span> <span class="nl">name:</span><span class="n">MCAudioSessionInterruptionNotification</span> <span class="nl">object:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">([[</span><span class="n">MCAudioSession</span> <span class="n">sharedInstance</span><span class="p">]</span> <span class="nl">setActive:</span><span class="n">YES</span> <span class="nl">error:</span><span class="nb">NULL</span><span class="p">])</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="c1">//go on</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>读取、解析音频数据</h1>
+
+<p>成功创建并启用AudioSession之后就可以进入播放流程了，播放是一个无限循环的过程，所以我们需要一个while循环，在文件没有被播放完成之前需要反复的读取、解析、播放。那么第一步是需要读取并解析数据。按照之前说的我们会先使用<code>AudioFileStream</code>，引入<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>末尾给出的AudioFileStream封装<a href="https://github.com/msching/MCAudioFileStream">MCAudioFileStream</a>。</p>
+
+<p>创建AudioFileStream，<strong>MCAudioFileStream</strong>的init方法会完成这项工作，如果创建成功就设置delegate作为Parse数据的回调。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">_audioFileStream</span> <span class="o">=</span> <span class="p">[[</span><span class="n">MCAudioFileStream</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithFileType:</span><span class="n">_fileType</span> <span class="nl">fileSize:</span><span class="n">_fileSize</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
+</span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">error</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">_audioFileStream</span><span class="p">.</span><span class="n">delegate</span> <span class="o">=</span> <span class="n">self</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接下来要读取数据并且解析，用成员变量<code>_offset</code>表示<code>_fileHandler</code>已经读取文件位置，其主要作用是来判断Eof。调用<strong>MCAudioFileStream</strong>的<code>-parseData:error:</code>方法来对数据进行解析。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">_fileHandler</span> <span class="nl">readDataOfLength:</span><span class="mi">1000</span><span class="p">];</span>
+</span><span class='line'><span class="n">_offset</span> <span class="o">+=</span> <span class="p">[</span><span class="n">data</span> <span class="n">length</span><span class="p">];</span>
+</span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">_offset</span> <span class="o">&gt;=</span> <span class="n">_fileSize</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">isEof</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'><span class="p">[</span><span class="n">_audioFileStream</span> <span class="nl">parseData:</span><span class="n">data</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
+</span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">error</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="c1">//解析失败，换用AudioFile</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>解析完文件头之后<strong>MCAudioFileStream</strong>的<code>readyToProducePackets</code>属性会被置为YES，此后所有的Parse方法都回触发<code>-audioFileStream:audioDataParsed:</code>方法并传递<code>MCParsedAudioData</code>的数组来保存解析完成的数据。这样就需要一个buffer来存储这些解析完成的音频数据。</p>
+
+<p>于是创建了<code>MCAudioBuffer</code>类来管理所有解析完成的数据：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">@interface</span> <span class="nc">MCAudioBuffer</span> : <span class="nc">NSObject</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">instancetype</span><span class="p">)</span><span class="nf">buffer</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">enqueueData:</span><span class="p">(</span><span class="n">MCParsedAudioData</span> <span class="o">*</span><span class="p">)</span><span class="nv">data</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">enqueueFromDataArray:</span><span class="p">(</span><span class="n">NSArray</span> <span class="o">*</span><span class="p">)</span><span class="nv">dataArray</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">hasData</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">UInt32</span><span class="p">)</span><span class="nf">bufferedSize</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">NSData</span> <span class="o">*</span><span class="p">)</span><span class="nf">dequeueDataWithSize:</span><span class="p">(</span><span class="n">UInt32</span><span class="p">)</span><span class="nv">requestSize</span>
+</span><span class='line'>                    <span class="nf">packetCount:</span><span class="p">(</span><span class="n">UInt32</span> <span class="o">*</span><span class="p">)</span><span class="nv">packetCount</span>
+</span><span class='line'>                   <span class="nf">descriptions:</span><span class="p">(</span><span class="n">AudioStreamPacketDescription</span> <span class="o">**</span><span class="p">)</span><span class="nv">descriptions</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">clean</span><span class="p">;</span>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>创建一个<strong>MCAudioBuffer</strong>的实例<code>_buffer</code>，解析完成的数据都会通过<code>enqueue</code>方法存储到<strong>_buffer</strong>中，在需要的使用可以通过<code>dequeue</code>取出来使用。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">_buffer</span> <span class="o">=</span> <span class="p">[</span><span class="n">MCAudioBuffer</span> <span class="n">buffer</span><span class="p">];</span> <span class="c1">//初始化方法中创建</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//AudioFileStream解析完成的数据都被存储到了_buffer中</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">audioFileStream:</span><span class="p">(</span><span class="n">MCAudioFileStream</span> <span class="o">*</span><span class="p">)</span><span class="nv">audioFileStream</span> <span class="nf">audioDataParsed:</span><span class="p">(</span><span class="n">NSArray</span> <span class="o">*</span><span class="p">)</span><span class="nv">audioData</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_buffer</span> <span class="nl">enqueueFromDataArray:</span><span class="n">audioData</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>如果遇到<strong>AudioFileStream</strong>解析失败的话，转而使用<strong>AudioFile</strong>，引入<a href="/blog/2014/07/19/audio-in-ios-4/">第四篇</a>末尾给出的AudioFile封装<a href="https://github.com/msching/MCAudioFile">MCAudioFile</a>（之前没有给出，最近补上的）。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">_audioFileStream</span> <span class="nl">parseData:</span><span class="n">data</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
+</span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">error</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="c1">//解析失败，换用AudioFile</span>
+</span><span class='line'>    <span class="n">_usingAudioFile</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">continue</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">_usingAudioFile</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">_audioFile</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">_audioFile</span> <span class="o">=</span> <span class="p">[[</span><span class="n">MCAudioFile</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithFilePath:</span><span class="n">_filePath</span> <span class="nl">fileType:</span><span class="n">_fileType</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">([</span><span class="n">_buffer</span> <span class="n">bufferedSize</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">_bufferSize</span> <span class="o">||</span> <span class="o">!</span><span class="n">_audioQueue</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="c1">//AudioFile解析完成的数据都被存储到了_buffer中</span>
+</span><span class='line'>        <span class="n">NSArray</span> <span class="o">*</span><span class="n">parsedData</span> <span class="o">=</span> <span class="p">[</span><span class="n">_audioFile</span> <span class="nl">parseData:</span><span class="o">&amp;</span><span class="n">isEof</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_buffer</span> <span class="nl">enqueueFromDataArray:</span><span class="n">parsedData</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>使用<strong>AudioFile</strong>时同样需要<strong>NSFileHandle</strong>来读取文件数据，但由于其回获取数据的特性我把FileHandle的相关操作都封装进去了，所以使用<strong>MCAudioFile</strong>解析数据时直接调用Parse方法即可。</p>
+
+<hr />
+
+<h1>播放</h1>
+
+<p>有了解析完成的数据，接下来就该AudioQueue出场了，引入<a href="/blog/2014/08/02/audio-in-ios-5/">第五篇</a>末尾提到的AudioQueue的封装<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>。</p>
+
+<p>首先创建AudioQueue，由于AudioQueue需要实现创建重用buffer所以需要事先确定bufferSize，这里我设置的bufferSize是近似0.1秒的数据量，计算bufferSize需要用到的duration和audioDataByteCount可以从<strong>MCAudioFileStream</strong>或者<strong>MCAudioFile</strong>中获取。有了bufferSize之后，加上数据格式format参数和magicCookie（部分音频格式需要）就可以生成AudioQueue了。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">createAudioQueue</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_audioQueue</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">NSTimeInterval</span> <span class="n">duration</span> <span class="o">=</span> <span class="n">_usingAudioFile</span> <span class="o">?</span> <span class="n">_audioFile</span><span class="p">.</span><span class="n">duration</span> <span class="o">:</span> <span class="n">_audioFileStream</span><span class="p">.</span><span class="n">duration</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">UInt64</span> <span class="n">audioDataByteCount</span> <span class="o">=</span> <span class="n">_usingAudioFile</span> <span class="o">?</span> <span class="n">_audioFile</span><span class="p">.</span><span class="n">audioDataByteCount</span> <span class="o">:</span> <span class="n">_audioFileStream</span><span class="p">.</span><span class="n">audioDataByteCount</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_bufferSize</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">duration</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">_bufferSize</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.1</span> <span class="o">/</span> <span class="n">duration</span><span class="p">)</span> <span class="o">*</span> <span class="n">audioDataByteCount</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_bufferSize</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">AudioStreamBasicDescription</span> <span class="n">format</span> <span class="o">=</span> <span class="n">_usingAudioFile</span> <span class="o">?</span> <span class="n">_audioFile</span><span class="p">.</span><span class="n">format</span> <span class="o">:</span> <span class="n">_audioFileStream</span><span class="p">.</span><span class="n">format</span><span class="p">;</span>
+</span><span class='line'>        <span class="n">NSData</span> <span class="o">*</span><span class="n">magicCookie</span> <span class="o">=</span> <span class="n">_usingAudioFile</span> <span class="o">?</span> <span class="p">[</span><span class="n">_audioFile</span> <span class="n">fetchMagicCookie</span><span class="p">]</span> <span class="o">:</span> <span class="p">[</span><span class="n">_audioFileStream</span> <span class="n">fetchMagicCookie</span><span class="p">];</span>
+</span><span class='line'>        <span class="n">_audioQueue</span> <span class="o">=</span> <span class="p">[[</span><span class="n">MCAudioOutputQueue</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithFormat:</span><span class="n">format</span> <span class="nl">bufferSize:</span><span class="n">_bufferSize</span> <span class="nl">macgicCookie:</span><span class="n">magicCookie</span><span class="p">];</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">_audioQueue</span><span class="p">.</span><span class="n">available</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">_audioQueue</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'>            <span class="k">return</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接下来从<strong>_buffer</strong>中读出解析完成的数据，交给AudioQueue播放。如果全部播放完毕了就调用一下<code>-flush</code>让AudioQueue把剩余数据播放完毕。这里需要注意的是<strong>MCAudioOutputQueue</strong>的<code>-playData</code>方法在调用时如果没有可以重用的buffer的话会阻塞当前线程直到<code>AudioQueue</code>回调方法送出可重用的buffer为止。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">UInt32</span> <span class="n">packetCount</span><span class="p">;</span>
+</span><span class='line'><span class="n">AudioStreamPacketDescription</span> <span class="o">*</span><span class="n">desces</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+</span><span class='line'><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">_buffer</span> <span class="nl">dequeueDataWithSize:</span><span class="n">_bufferSize</span> <span class="nl">packetCount:</span><span class="o">&amp;</span><span class="n">packetCount</span> <span class="nl">descriptions:</span><span class="o">&amp;</span><span class="n">desces</span><span class="p">];</span>
+</span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">packetCount</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_audioQueue</span> <span class="nl">playData:</span><span class="n">data</span> <span class="nl">packetCount:</span><span class="n">packetCount</span> <span class="nl">packetDescriptions:</span><span class="n">desces</span> <span class="nl">isEof:</span><span class="n">isEof</span><span class="p">];</span>
+</span><span class='line'>    <span class="n">free</span><span class="p">(</span><span class="n">desces</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">[</span><span class="n">_buffer</span> <span class="n">hasData</span><span class="p">]</span> <span class="o">&amp;&amp;</span> <span class="n">isEof</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_audioQueue</span> <span class="n">flush</span><span class="p">];</span>
+</span><span class='line'>        <span class="k">break</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>暂停 &amp; 恢复</h1>
+
+<p>暂停方法很简单，调用<strong>MCAudioOutputQueue</strong>的<code>-pause</code>方法就可以了，但要注意的是需要和<code>-playData:</code>同步调用，否则可能引起一些问题（比如触发了pause实际由于并发操作没有真正pause住）。</p>
+
+<p>同步的方法可以采用加锁的方式，也可以通过标志位在<code>threadMain</code>中进行Pause，Demo中我使用了后者。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//pause方法</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">pause</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">isPlayingOrWaiting</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">_pauseRequired</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//threadMain中</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">threadMain</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">...</span>
+</span><span class='line'>  
+</span><span class='line'>    <span class="c1">//pause</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_pauseRequired</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span> <span class="nl">setStatusInternal:</span><span class="n">MCSAPStatusPaused</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_audioQueue</span> <span class="n">pause</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span> <span class="n">_mutexWait</span><span class="p">];</span>
+</span><span class='line'>        <span class="n">_pauseRequired</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>  
+</span><span class='line'>    <span class="c1">//play</span>
+</span><span class='line'>    <span class="p">...</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在暂停后还要记得阻塞线程。</p>
+
+<p>恢复只要调用<strong>AudioQueue</strong> start方法就可以了，同时记得signal让线程继续跑</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">_resume</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="c1">//AudioQueue的start方法被封装到了MCAudioOutputQueue的resume方法中</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_audioQueue</span> <span class="n">resume</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">self</span> <span class="n">_mutexSignal</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>播放进度 &amp; Seek</h1>
+
+<p>对于播放进度我在<a href="/blog/2014/08/02/audio-in-ios-5/">第五篇</a>讲<strong>AudioQueue</strong>时已经提到过了，使用<code>AudioQueueGetCurrentTime</code>方法可以获取<code>实际播放的时间</code>如果Seek之后需要根据计算timingOffset，然后根据timeOffset来计算最终的播放进度：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">NSTimeInterval</span><span class="p">)</span><span class="nf">progress</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">_timingOffset</span> <span class="o">+</span> <span class="n">_audioQueue</span><span class="p">.</span><span class="n">playedTime</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>timingOffset的计算在Seek进行，Seek操作和暂停操作一样需要和其他<strong>AudioQueue</strong>的操作同步进行，否则可能造成一些并发问题。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//seek方法</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setProgress:</span><span class="p">(</span><span class="n">NSTimeInterval</span><span class="p">)</span><span class="nv">progress</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">_seekRequired</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_seekTime</span> <span class="o">=</span> <span class="n">progress</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在seek时为了防止播放进度跳动，修改一下获取播放进度的方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">NSTimeInterval</span><span class="p">)</span><span class="nf">progress</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_seekRequired</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">_seekTime</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">_timingOffset</span> <span class="o">+</span> <span class="n">_audioQueue</span><span class="p">.</span><span class="n">playedTime</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>下面是<code>threadMain</code>中的Seek操作</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">_seekRequired</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">self</span> <span class="nl">setStatusInternal:</span><span class="n">MCSAPStatusWaiting</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">_timingOffset</span> <span class="o">=</span> <span class="n">_seekTime</span> <span class="o">-</span> <span class="n">_audioQueue</span><span class="p">.</span><span class="n">playedTime</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_buffer</span> <span class="n">clean</span><span class="p">];</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_usingAudioFile</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_audioFile</span> <span class="nl">seekToTime:</span><span class="n">_seekTime</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">_offset</span> <span class="o">=</span> <span class="p">[</span><span class="n">_audioFileStream</span> <span class="nl">seekToTime:</span><span class="o">&amp;</span><span class="n">_seekTime</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_fileHandler</span> <span class="nl">seekToFileOffset:</span><span class="n">_offset</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="n">_seekRequired</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_audioQueue</span> <span class="n">reset</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Seek时需要做如下事情：</p>
+
+<ol>
+<li>计算timingOffset</li>
+<li>清除之前残余在<code>_buffer</code>中的数据</li>
+<li>挪动NSFileHandle的游标</li>
+<li>清除<strong>AudioQueue</strong>中已经Enqueue的数据</li>
+<li>如果有用到音效器的还需要清除音效器里的残余数据</li>
+</ol>
+
+
+<hr />
+
+<h1>打断</h1>
+
+<p>在接到Interrupt通知时需要处理打断，下面是打断的处理方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">interruptHandler:</span><span class="p">(</span><span class="n">NSNotification</span> <span class="o">*</span><span class="p">)</span><span class="nv">notification</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">UInt32</span> <span class="n">interruptionState</span> <span class="o">=</span> <span class="p">[</span><span class="n">notification</span><span class="p">.</span><span class="n">userInfo</span><span class="p">[</span><span class="n">MCAudioSessionInterruptionStateKey</span><span class="p">]</span> <span class="n">unsignedIntValue</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">interruptionState</span> <span class="o">==</span> <span class="n">kAudioSessionBeginInterruption</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">_pausedByInterrupt</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_audioQueue</span> <span class="n">pause</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span> <span class="nl">setStatusInternal:</span><span class="n">MCSAPStatusPaused</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">interruptionState</span> <span class="o">==</span> <span class="n">kAudioSessionEndInterruption</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">AudioSessionInterruptionType</span> <span class="n">interruptionType</span> <span class="o">=</span> <span class="p">[</span><span class="n">notification</span><span class="p">.</span><span class="n">userInfo</span><span class="p">[</span><span class="n">MCAudioSessionInterruptionTypeKey</span><span class="p">]</span> <span class="n">unsignedIntValue</span><span class="p">];</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span><span class="n">interruptionType</span> <span class="o">==</span> <span class="n">kAudioSessionInterruptionType_ShouldResume</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">MCSAPStatusPaused</span> <span class="o">&amp;&amp;</span> <span class="n">_pausedByInterrupt</span><span class="p">)</span>
+</span><span class='line'>            <span class="p">{</span>
+</span><span class='line'>                <span class="k">if</span> <span class="p">([[</span><span class="n">MCAudioSession</span> <span class="n">sharedInstance</span><span class="p">]</span> <span class="nl">setActive:</span><span class="n">YES</span> <span class="nl">error:</span><span class="nb">NULL</span><span class="p">])</span>
+</span><span class='line'>                <span class="p">{</span>
+</span><span class='line'>                    <span class="p">[</span><span class="n">self</span> <span class="n">play</span><span class="p">];</span>
+</span><span class='line'>                <span class="p">}</span>
+</span><span class='line'>            <span class="p">}</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这里需要注意，打断操作我放在了主线程进行而并非放到新开的线程中进行，原因如下：</p>
+
+<ul>
+<li><p>一旦打断开始<strong>AudioSession</strong>被抢占后音频立即被打断，此时<strong>AudioQueue</strong>的所有操作会暂停，这就意味着不会有任何数据消耗回调产生；</p></li>
+<li><p>我这个Demo的线程模型中在向<strong>AudioQueue</strong> Enqueue了足够多的数据之后会阻塞当前线程等待数据消耗的回调才会signal让线程继续跑；</p></li>
+</ul>
+
+
+<p>于是就得到了这样的结论：一旦打断开始我创建的线程就会被阻塞，所以我需要在主线程来处理暂停和恢复播放。</p>
+
+<hr />
+
+<h1>停止 &amp; 清理</h1>
+
+<p>停止操作也和其他操作一样会放到<code>threadMain</code>中执行</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">stop</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">_stopRequired</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">self</span> <span class="n">_mutexSignal</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//treadMain中</span>
+</span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">_stopRequired</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">_stopRequired</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_started</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_audioQueue</span> <span class="nl">stop:</span><span class="n">YES</span><span class="p">];</span>
+</span><span class='line'>    <span class="k">break</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在播放被停止或者出错时会进入到清理流程，这里需要做一大堆操作，清理各种数据，关闭AudioSession，清除各种标记等等。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">cleanup</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="c1">//reset file</span>
+</span><span class='line'>    <span class="n">_offset</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_fileHandler</span> <span class="nl">seekToFileOffset:</span><span class="mi">0</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">//deactive audiosession</span>
+</span><span class='line'>    <span class="p">[[</span><span class="n">MCAudioSession</span> <span class="n">sharedInstance</span><span class="p">]</span> <span class="nl">setActive:</span><span class="n">NO</span> <span class="nl">error:</span><span class="nb">NULL</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">[[</span><span class="n">NSNotificationCenter</span> <span class="n">defaultCenter</span><span class="p">]</span> <span class="nl">removeObserver:</span><span class="n">self</span> <span class="nl">name:</span><span class="n">MCAudioSessionInterruptionNotification</span> <span class="nl">object:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">//clean buffer</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_buffer</span> <span class="n">clean</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">_usingAudioFile</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="c1">//close audioFileStream</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_audioFileStream</span> <span class="n">close</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">//close audiofile</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_audioFile</span> <span class="n">close</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">//stop audioQueue</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_audioQueue</span> <span class="nl">stop:</span><span class="n">YES</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">//destory mutex &amp; cond</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">self</span> <span class="n">_mutexDestory</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">_started</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_timingOffset</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_seekTime</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_seekRequired</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_pauseRequired</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">_stopRequired</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">//reset status</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">self</span> <span class="nl">setStatusInternal:</span><span class="n">MCSAPStatusStopped</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>连接播放器UI</h1>
+
+<p>播放器代码完成后就需要和UI连起来让播放器跑起来了。</p>
+
+<p>在viewDidLoad时创建一个播放器：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">viewDidLoad</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">super</span> <span class="n">viewDidLoad</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">_player</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">NSString</span> <span class="o">*</span><span class="n">path</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSBundle</span> <span class="n">mainBundle</span><span class="p">]</span> <span class="nl">pathForResource:</span><span class="s">@&quot;MP3Sample&quot;</span> <span class="nl">ofType:</span><span class="s">@&quot;mp3&quot;</span><span class="p">];</span>
+</span><span class='line'>        <span class="n">_player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">MCSimpleAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithFilePath:</span><span class="n">path</span> <span class="nl">fileType:</span><span class="n">kAudioFileMP3Type</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="p">[</span><span class="n">_player</span> <span class="nl">addObserver:</span><span class="n">self</span> <span class="nl">forKeyPath:</span><span class="s">@&quot;status&quot;</span> <span class="nl">options:</span><span class="n">NSKeyValueObservingOptionNew</span> <span class="nl">context:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_player</span> <span class="n">play</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>对播放器的status属性KVO用来操作播放和暂停按钮的状态以及播放进度timer的开启和暂停：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">observeValueForKeyPath:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">keyPath</span> <span class="nf">ofObject:</span><span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nv">object</span> <span class="nf">change:</span><span class="p">(</span><span class="n">NSDictionary</span> <span class="o">*</span><span class="p">)</span><span class="nv">change</span> <span class="nf">context:</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span><span class="nv">context</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">object</span> <span class="o">==</span> <span class="n">_player</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">([</span><span class="n">keyPath</span> <span class="nl">isEqualToString:</span><span class="s">@&quot;status&quot;</span><span class="p">])</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="p">[</span><span class="n">self</span> <span class="nl">performSelectorOnMainThread:</span><span class="k">@selector</span><span class="p">(</span><span class="n">handleStatusChanged</span><span class="p">)</span> <span class="nl">withObject:</span><span class="nb">nil</span> <span class="nl">waitUntilDone:</span><span class="n">NO</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">handleStatusChanged</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_player</span><span class="p">.</span><span class="n">isPlayingOrWaiting</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">playOrPauseButton</span> <span class="nl">setTitle:</span><span class="s">@&quot;Pause&quot;</span> <span class="nl">forState:</span><span class="n">UIControlStateNormal</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span> <span class="n">startTimer</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">playOrPauseButton</span> <span class="nl">setTitle:</span><span class="s">@&quot;Play&quot;</span> <span class="nl">forState:</span><span class="n">UIControlStateNormal</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span> <span class="n">stopTimer</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">self</span> <span class="nl">progressMove:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>播放进度交给timer来刷新：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">startTimer</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">_timer</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="n">_timer</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSTimer</span> <span class="nl">scheduledTimerWithTimeInterval:</span><span class="mi">1</span> <span class="nl">target:</span><span class="n">self</span> <span class="nl">selector:</span><span class="k">@selector</span><span class="p">(</span><span class="nl">progressMove:</span><span class="p">)</span> <span class="nl">userInfo:</span><span class="nb">nil</span> <span class="nl">repeats:</span><span class="n">YES</span><span class="p">];</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_timer</span> <span class="n">fire</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">stopTimer</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_timer</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_timer</span> <span class="n">invalidate</span><span class="p">];</span>
+</span><span class='line'>        <span class="n">_timer</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">progressMove:</span><span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nv">sender</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="c1">//在seek时不要刷新slider的thumb位置</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">self</span><span class="p">.</span><span class="n">progressSlider</span><span class="p">.</span><span class="n">tracking</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span><span class="n">_player</span><span class="p">.</span><span class="n">duration</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">self</span><span class="p">.</span><span class="n">progressSlider</span><span class="p">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">_player</span><span class="p">.</span><span class="n">progress</span> <span class="o">/</span> <span class="n">_player</span><span class="p">.</span><span class="n">duration</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>        <span class="k">else</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>            <span class="n">self</span><span class="p">.</span><span class="n">progressSlider</span><span class="p">.</span><span class="n">value</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>监听slider的两个TouchUp时间来进行seek操作：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">IBAction</span><span class="p">)</span><span class="nf">seek:</span><span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nv">sender</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="n">_player</span><span class="p">.</span><span class="n">progress</span> <span class="o">=</span> <span class="n">_player</span><span class="p">.</span><span class="n">duration</span> <span class="o">*</span> <span class="n">self</span><span class="p">.</span><span class="n">progressSlider</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>添加两个按钮的TouchUpInside事件进行播放控制：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">IBAction</span><span class="p">)</span><span class="nf">playOrPause:</span><span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nv">sender</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">_player</span><span class="p">.</span><span class="n">isPlayingOrWaiting</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_player</span> <span class="n">pause</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="p">[</span><span class="n">_player</span> <span class="n">play</span><span class="p">];</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">IBAction</span><span class="p">)</span><span class="nf">stop:</span><span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nv">sender</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">_player</span> <span class="n">stop</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>进阶的内容</h1>
+
+<p>关于简单播放器的构建就讲这么多，以下是一些音频播放相关的进阶内容，由于我自己也没有摸透它们所以暂时就不做详细介绍了以免误人子弟-_-，各位有兴趣可以研究一下，如果有疑问或者有新发现欢迎大家留言或者在<a href="http://weibo.com/msching">微博</a>上和我交流共同提高~</p>
+
+<ol>
+<li><code>AudioConverter</code>可以实现音频数据的转换，在播放流程中它可以充当解码器的角色，可以把压缩的音频数据解码成为PCM数据；</li>
+<li><code>AudioUnit</code>作为比<code>AudioQueue</code>更底层的音频播放类库，Apple赋予了它更强大的功能，除了一般的播放功能之外它还能使用iPhone自带的多种均衡器对音效进行调节；</li>
+<li><code>AUGraph</code>为<code>AudioUnit</code>提供音效处理功能（这个其实我一点也没接触过0_0）</li>
+</ol>
+
+
+<hr />
+
+<h1>示例代码</h1>
+
+<p>上面所讲述的内容对应的工程已经在github上了（<a href="https://github.com/msching/MCSimpleAudioPlayer">MCSimpleAudioPlayer</a>），有任何问题可以给我发issue~</p>
+
+<hr />
+
+<h1>下篇预告</h1>
+
+<p>下一篇会介绍一下如何播放iOS系统<code>MediaLibrary</code>中的歌曲（俗称iPod音乐或者本地音乐）</p>
+</div>
+	
+		<br>
+<br>原创文章，版权声明：自由转载-非商用-非衍生-保持署名 | <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.zh">Creative Commons BY-NC-ND 3.0</a></br>
+	
+
+</article>
+
+	<div class="share">
+	<!-- JiaThis Button BEGIN -->
+	<div class="jiathis_style_24x24">
+		<a class="jiathis_button_qzone"></a>
+		<a class="jiathis_button_tsina"></a>
+		<a class="jiathis_button_tqq"></a>
+		<a class="jiathis_button_weixin"></a>
+		<a class="jiathis_button_renren"></a>
+		<a href="http://www.jiathis.com/share?uid=1925419" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+		<a class="jiathis_counter_style"></a>
+	</div>
+	<script type="text/javascript">
+	var jiathis_config = {data_track_clickback:'true'};
+	</script>
+	<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js?uid=1395452865339302" charset="utf-8"></script>
+	<!-- JiaThis Button END -->
+</div>
+
+
+
+<section id="comment">
+    <h1 class="title">Comments</h1>
+    <!-- UY BEGIN -->
+<div id="uyan_frame"></div>
+<script type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1925419"></script>
+<!-- UY END -->
+</section>
+</div>
+			</div>
+			<footer id="footer" class="inner">Copyright &copy; 2014
+
+    ChengYinZju
+
+.
+Powered by <a href="http://octopress.org">Octopress</a>, <a href="https://github.com">GitHub</a>, <a href="https://gitcafe.com">GitCafe</a>.
+<br>Design credit: <a href="http://shashankmehta.in/archive/2012/greyshade.html">Shashank Mehta</a>.</br></footer>
+			<script src="/javascripts/slash.js"></script>
+<script src="/javascripts/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+	$('.fancybox').fancybox();
+})(jQuery);
+</script> <!-- Delete or comment this line to disable Fancybox -->
+
+
+
+
+
+
+		</div>
+	</div>
+</body>
+</html>
