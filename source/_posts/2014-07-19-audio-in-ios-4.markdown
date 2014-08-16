@@ -412,7 +412,11 @@ extern OSStatus AudioFileClose (AudioFileID inAudioFile);
 
 #示例代码
 
-对于本地文件用AudioFile读取比较简单就不在这里提供demo了，对于流播放中的AudioFile使用推荐大家阅读豆瓣的开源播放器代码[DOUAudioStreamer](https://github.com/douban/DOUAudioStreamer)。
+~~对于本地文件用AudioFile读取比较简单就不在这里提供demo了，~~
+
+[简单的AudioFile封装](https://github.com/msching/MCAudioFile)。
+
+对于流播放中的AudioFile使用推荐大家阅读豆瓣的开源播放器代码[DOUAudioStreamer](https://github.com/douban/DOUAudioStreamer)。
 
 ----
 

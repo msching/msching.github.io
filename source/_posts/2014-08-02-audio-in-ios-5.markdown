@@ -324,7 +324,7 @@ enum    // typedef UInt32 AudioQueueParameterID;
 
 #示例代码
 
-[AudioStreamer](https://github.com/mattgallagher/AudioStreamer)和[FreeStreamer](https://github.com/muhku/FreeStreamer)都用到了AudioQueue。
+[AudioStreamer](https://github.com/mattgallagher/AudioStreamer)和[FreeStreamer](https://github.com/muhku/FreeStreamer)都用到了AudioQueue。在上面提到的Demo中也有我自己做的封装[MCAudioOutputQueue](https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h)。
 
 ----
 
