@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-08-16T14:38:49+08:00</updated>
+  <updated>2014-09-27T23:48:24+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,293 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[iOS音频播放 (七)：播放iPod Library中的歌曲]]></title>
+    <link href="http://msching.github.io/blog/2014/09/07/audio-in-ios-7/"/>
+    <updated>2014-09-07T15:45:47+08:00</updated>
+    <id>http://msching.github.io/blog/2014/09/07/audio-in-ios-7</id>
+    <content type="html"><![CDATA[<h1>前言</h1>
+
+<p>由于最近工作量非常饱和，所以这第七篇来的有点晚（创建时间是9月7日。。说出来都是泪）。</p>
+
+<p>现在市面上的音乐播放器都支持iPod Library歌曲（俗称iPod音乐或者本地音乐）的播放，用户对于iPod音乐播放的需求也一直十分强烈。这篇要讲的是如何来播放iPod Library的歌曲。</p>
+
+<hr />
+
+<h1>概述</h1>
+
+<p>根据<a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW43">官方文档</a>描述Apple从iOS 3.0开始允许开发者访问用户的iPod library来获取用户放在其中的歌曲等多媒体内容。</p>
+
+<p>为此Apple提供了多种方法来访问和播放iPod中的音乐，下面我们来分别列举一下这些方法。</p>
+
+<hr />
+
+<h1>访问MediaLibrary</h1>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/AboutiPodLibraryAccess/AboutiPodLibraryAccess.html#//apple_ref/doc/uid/TP40008765-CH103-SW9">官方文档</a>访问iPod Library的方法有两种，分别是MediaPicker和MediaQuery。</p>
+
+<p><img src="/images/iOS-audio/iPodLibraryAccessOverview.jpg" alt="" /></p>
+
+<h3>MediaPicker</h3>
+
+<p>MediaPicker是一个高度封装的iPod Library访问方式，通过使用<code>MPMediaPickerController</code>类来访问iPod Library。这是一个UI控件，用户可以根据需要选择其中的音乐。这个类使用时非常方便，只需要生成一个``的实例，设置一下属性和delegate后present出来，接下来只要等待回调即可，在回调时需要手动dismiss picker。</p>
+
+<p>```objc
+MPMediaPickerController *picker = [[MPMediaPickerController alloc] initWithMediaTypes:MPMediaTypeAnyAudio];
+picker.prompt = @&ldquo;请选择需要播放的歌曲&rdquo;;
+picker.showsCloudItems = NO;
+picker.allowsPickingMultipleItems = YES;
+picker.delegate = self;
+[self presentViewController:picker animated:YES completion:nil];</p>
+
+<ul>
+<li><p>(void)mediaPickerDidCancel:(MPMediaPickerController *)mediaPicker
+{
+  [mediaPicker dismissViewControllerAnimated:YES completion:nil];
+}</p></li>
+<li><p>(void)mediaPicker:(MPMediaPickerController <em>)mediaPicker didPickMediaItems:(MPMediaItemCollection </em>)mediaItemCollection
+{
+  [mediaPicker dismissViewControllerAnimated:YES completion:nil];
+  //do something
+}
+```</p></li>
+</ul>
+
+
+<p>上面的代码将会得到如下的效果：</p>
+
+<p><img src="/images/iOS-audio/MediaPicker.jpg" alt="" /></p>
+
+<p>通过MediaPicker最终可以得到<code>MPMediaItemCollection</code>，其中存放着所有在Picker中选中的歌曲，每一个歌曲使用一个<code>MPMediaItem</code>对象表示。对于MediaPicker的使用也可以参考<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingtheMediaItemPicker/UsingtheMediaItemPicker.html#//apple_ref/doc/uid/TP40008765-CH104-SW1">官方文档</a>。</p>
+
+<h3>MediaQuery</h3>
+
+<p>如果你觉得MeidaPicker的功能或者UI不能满足你的要求那么可以使用MediaQuery。MediaQuery可以直接访问iPod Library的DB，并根据需要获取数据。<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingTheiPodLibrary/UsingTheiPodLibrary.html#//apple_ref/doc/uid/TP40008765-CH101-SW1">官方文档</a>给出了MediaQuery的示意图。</p>
+
+<p><img src="/images/iOS-audio/database_access_classes.jpg" alt="" /></p>
+
+<p>MediaQuery功能十分强大，它可以根据一个或多个条件查询满足需要的MediaItem。</p>
+
+<p>你可以使用<code>MPMediaQuery</code>的类方法来生成一些已经预置了条件的Query</p>
+
+<p><code>objc
+// Base queries which can be used directly or as the basis for custom queries.
+// The groupingType for these queries is preset to the appropriate type for the query.
++ (MPMediaQuery *)albumsQuery;
++ (MPMediaQuery *)artistsQuery;
++ (MPMediaQuery *)songsQuery;
++ (MPMediaQuery *)playlistsQuery;
++ (MPMediaQuery *)podcastsQuery;
++ (MPMediaQuery *)audiobooksQuery;
++ (MPMediaQuery *)compilationsQuery;
++ (MPMediaQuery *)composersQuery;
++ (MPMediaQuery *)genresQuery;
+</code>
+也可以自己生成<code>MPMediaPredicate</code>设置条件，并把它加到Query中，最后通过items和collections访问查询到的结果，例如：</p>
+
+<p>```objc
+MPMediaPropertyPredicate *artistNamePredicate =
+[MPMediaPropertyPredicate predicateWithValue:@&ldquo;Happy the Clown&rdquo;</p>
+
+<pre><code>                             forProperty:MPMediaItemPropertyArtist
+                          comparisonType:MPMediaPredicateComparisonEqualTo];
+</code></pre>
+
+<p>MPMediaQuery *quert = [[MPMediaQuery alloc] init];
+[quert addFilterPredicate: artistNamePredicate];
+quert.groupingType = MPMediaGroupingArtist;</p>
+
+<p>NSArray <em>itemsFromArtistQuery = [quert items];
+NSArray </em>collectionsFromArtistQuery = [quert collections];
+```
+这一过程可以表示为（图来自<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/AboutiPodLibraryAccess/AboutiPodLibraryAccess.html#//apple_ref/doc/uid/TP40008765-CH103-SW9">官方文档</a>）：</p>
+
+<p><img src="/images/iOS-audio/mediaQuery.jpg" alt="" /></p>
+
+<p>这里对于MediaQuery的用法就不再继续展开，关于这块内容并没有什么晦涩难懂的地方需要解释，大家可以通过阅读<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingTheiPodLibrary/UsingTheiPodLibrary.html#//apple_ref/doc/uid/TP40008765-CH101-SW1">官方文档</a>来详细了解其用法。</p>
+
+<h3>MediaCollection</h3>
+
+<p><code>MPMediaCollection</code>是MediaItem的合集，可以通过访问它的items属性来访问所有的MediaItem。</p>
+
+<p><code>MPMediaPlaylist</code>是一个特殊的<code>MPMediaCollection</code>代表用户创建的播放列表，它会比MediaCollection包含更多的信息，比如播放列表的名字等等。这些属性可以通过<code>MPMediaEntity</code>的方法访问（MPMediaCollection是MPMediaEntity的子类，MPMediaItem也是）。
+```objc
+// Returns the value for the given entity property.
+// MPMediaItem and MPMediaPlaylist have their own properties
+&ndash; (id)valueForProperty:(NSString *)property;</p>
+
+<p>// Executes a provided block with the fetched values for the given item properties, or nil if no value is available for a property.
+// In some cases, enumerating the values for multiple properties can be more efficient than fetching each individual property with -valueForProperty:.
+&ndash; (void)enumerateValuesForProperties:(NSSet <em>)properties usingBlock:(void (^)(NSString </em>property, id value, BOOL *stop))block NS_AVAILABLE_IOS(4_0);
+```</p>
+
+<h3>MediaItem</h3>
+
+<p>通过MediaPicker和MediaQuery最终都会得到<code>MPMediaItem</code>，这个item中包含了许多信息。这些信息都可以通过<code>MPMediaEntity</code>的方法访问，其中参数非常多就不列举了具体可以参照MPMediaItem.h。</p>
+
+<hr />
+
+<h1>使用MPMusicPlayerController</h1>
+
+<p>拿到iPod Library中的歌曲后就可以开始播放了。播放的方式有很多种，先介绍一下<code>MediaPlayer framework</code>中的<code>MPMusicPlayerController</code>类。</p>
+
+<p>通过<code>MPMusicPlayerController</code>的类方法可以生成两种播放器，生成方法如下：</p>
+
+<p>```objc
+// Playing media items with the applicationMusicPlayer will restore the user&rsquo;s iPod state after the application quits.
++ (MPMusicPlayerController *)applicationMusicPlayer;</p>
+
+<p>// Playing media items with the iPodMusicPlayer will replace the user&rsquo;s current iPod state.
++ (MPMusicPlayerController *)iPodMusicPlayer;
+```</p>
+
+<p>这两个方法看似生成了一样的对象，但它们的行为却有很大不同。从Apple写的注释上我们可以很清楚的发现它们的区别。<code>+applicationMusicPlayer</code>不会继承来自iOS系统自带的iPod应用中的播放状态，同时也不会覆盖iPod的播放状态。而<code>+iPodMusicPlayer</code>完全继承iPod应用的播放状态（甚至是播放时间），对其实例的任何操作也会覆盖到iPod应用。对<code>+iPodMusicPlayer</code>方法command+点击后可以看到更详细的注释。</p>
+
+<p>```</p>
+
+<pre><code>The iPod music player employs the iPod app on your behalf. On instantiation, it takes on the current iPod app state and controls that state as your app runs. Specifically, the shared state includes the following:
+Repeat mode (see “Repeat Modes”)
+Shuffle mode (see “Shuffle Modes”
+Now-playing item (see nowPlayingItem)
+Playback state (see playbackState)
+
+Other aspects of iPod state, such as the on-the-go playlist, are not shared. Music that is playing continues to play when your app moves to the background.
+</code></pre>
+
+<p>```
+说白了，当在使用iPodMusicPlayerv其实并不是你的程序在播放音频，而是你的程序在操纵iPod应用播放音频，即使你的程序crash了或者被kill了，音乐也不会因此停止。</p>
+
+<p>而对于<code>+applicationMusicPlayer</code>通过command+点击可以看到：</p>
+
+<p>```
+The application music player plays music locally within your app. It does not affect the iPod state.
+When your app moves to the background, the music player stops if it was playing.</p>
+
+<p>```
+从注释中可以知道这个方法返回的对象虽然不是调用iPod应用播放的也不会影响到iPod应用，但它有个很大的缺点：无法后台播放，即使你在active了audioSession并且在app的设置中设置了Background Audio同样不会奏效。</p>
+
+<p>综上所述，一般在开发音乐软件时很少用到这两个接口来进行iPod Library的播放，大部分开发者都是用这个类中的volme来调整系统音量的（这个属性在SDK 7中也被deprecate掉了）。如果你想用到这个类进行播放的话，这里需要提个醒，给<code>MPMusicPlayerController</code>设置需要播放的音乐时要使用下面两个方法：</p>
+
+<p><code>objc
+// Call -play to begin playback after setting an item queue source. Setting a query will implicitly use MPMediaGroupingTitle.
+- (void)setQueueWithQuery:(MPMediaQuery *)query;
+- (void)setQueueWithItemCollection:(MPMediaItemCollection *)itemCollection;
+</code>
+而不是这个属性：</p>
+
+<p><code>objc
+// Returns the currently playing media item, or nil if none is playing.
+// Setting the nowPlayingItem to an item in the current queue will begin playback at that item.
+@property(nonatomic, copy) MPMediaItem *nowPlayingItem;
+</code>
+光看名字很容易被<code>nowPlayingItem</code>这个属性迷惑，它的意思其实是说在设置了MediaQuery或者MediaCollection之后再设置这个nowPlayingItem可以让播放器从这个item开始播放，前提是这个item需要在MediaQuery或者MediaCollection的.items集合内。</p>
+
+<hr />
+
+<h1>使用AVAudioPlayer和AVPlayer</h1>
+
+<p>除了使用MediaPlayer中的类还有很多其他方法来进行iPod播放，其中做的比较出色的是<code>AVFoundation</code>中的<code>AVAudioPlayer</code>和<code>AVPlayer</code>。</p>
+
+<p>这两个类的都有通过NSURL生成实例的初始化方法：</p>
+
+<p>```objc
+//AVAudioPlayer
+&ndash; (id)initWithContentsOfURL:(NSURL *)url error:(NSError **)outError;</p>
+
+<p>//AVPlayer
++ (id)playerWithURL:(NSURL <em>)URL;
+&ndash; (id)initWithURL:(NSURL </em>)URL;
+```</p>
+
+<p>其中的NSURL正是来自于<code>MPMediaItem</code>的<code>MPMediaItemPropertyAssetURL</code>属性。</p>
+
+<p><code>objc
+//A URL pointing to the media item,
+//from which an AVAsset object (or other URL-based AV Foundation object) can be created, with any options as desired.
+//Value is an NSURL object.
+MP_EXTERN NSString *const MPMediaItemPropertyAssetURL;
+</code>
+上面讲到<code>MPMediaItem</code>时已经提到了它是<code>MPMediaEntity</code>子类，可以通过<code>-valueForProperty:</code>方法访问其中的属性。通过传入<code>MPMediaItemPropertyAssetURL</code>就可以得到当前MediaItem对应的URL（ipod-library://xxxxx），生成Player进行播放。大致代码如下：</p>
+
+<p>```objc
+@interface MyClass : NSObject
+{</p>
+
+<pre><code>AVAudioPlayer *_player;
+//AVPlayer *_player;
+</code></pre>
+
+<p>}</p>
+
+<p>//设置AudioSession
+[[AVAudioSession sharedInstance] setActive:YES error:nil];
+[[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];</p>
+
+<p>//play
+NSError <em>error = nil;
+MPMediaItem </em>item = &hellip;;
+NSURL *url = [item valueForProperty:MPMediaItemPropertyAssetURL];
+<em>player = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&amp;error];
+//</em>player = [AVPlayer playerWithURL:url];
+[_player play];</p>
+
+<p>```</p>
+
+<p><strong>注意：这里我需要更正一下，之前我在<a href="/blog/2014/07/08/audio-in-ios-2/">第二篇</a>讲到AudioSession时写了这样一段话<code>在使用AVAudioPlayer/AVPlayer时可以不用关心AudioSession的相关问题，Apple已经把AudioSession的处理过程封装了...</code>。这段话不对，我把AVFoundation和Mediaplayer混淆了，在写的时候也没注意，应该是在使用MPMusicPlayerController播放时不需要关心AudioSession的问题。</strong></p>
+
+<hr />
+
+<h1>读取和导出数据</h1>
+
+<p>前面说到使用<code>MPMediaItem</code>的<code>MPMediaItemPropertyAssetURL</code>属性可以得到一个表示当前MediaItem的NSURL，有了这个NSURL我们使用AVFoundation中的类进行播放。播放只是最基本的需求，有了这个URL我们可以做更多更有趣的事情。</p>
+
+<p>在AVFoundation中还有两个有趣的类：<code>AVAssetReader</code>和<code>AVAssetExportSession</code>。它们可以把iPod Library中的指定歌曲以指定的音频格式导出到内存中或者硬盘中，这个指定的格式包括PCM。这是一个激动人心的特性，有了PCM数据我们就可以做很多很多其他的事情了。</p>
+
+<p>这部分如果要展开的话还会有相当多的内容，国外的先辈们早在2010年就已经发掘了这两个类的用法，详细参见<a href="http://www.subfurther.com/blog/2010/07/19/from-iphone-media-library-to-pcm-samples-in-dozens-of-confounding-potentially-lossy-steps/">这里</a>和<a href="http://www.subfurther.com/blog/2010/12/13/from-ipod-library-to-pcm-samples-in-far-fewer-steps-than-were-previously-necessary/">这里</a>。这两篇讲的比较详细并且附有Sample（其中还涉及了一些Extended Audio File Services的内容），如果里面Sample无法下载可以从点击<a href="/files/MediaLibraryExportThrowaway1.zip">MediaLibraryExportThrowaway1.zip</a>和<a href="/files/VTM_AViPodReader.zip">VTM_AViPodReader.zip</a>下载。</p>
+
+<p><strong>需要注意的是在使用<code>AVAssetReader</code>的过程中如果访问系统的相机或者照片可能会使<code>AVAssetReader</code>产生<code>AVErrorOperationInterrupted</code>错误，此时需要重新生成Reader后调用<code>-startReading</code>才可以继续读取数据。</strong></p>
+
+<hr />
+
+<h1>小结</h1>
+
+<p>本篇介绍了一些与iPod Library相关的内容，小结一下：</p>
+
+<ul>
+<li><p>Apple提供两种方法来访问iPod Library，它们分别是<code>MPMediaPickerController</code>和<code>MPMediaQuery</code>；</p></li>
+<li><p><code>MPMediaPickerController</code>和<code>MPMediaQuery</code>最后输出给开发者的对象是<code>MPMediaItem</code>，<code>MPMediaItem</code>的属性需要通过<code>-valueForProperty:</code>方法获取了；</p></li>
+<li><p><code>MPMusicPlayerController</code>可以用来播放<code>MPMediaItem</code>，但有很多局限性，使用时需要根据不同的使用场景来决定用哪个类方法生成实例；</p></li>
+<li><p><code>AVAudioPlayer</code>和<code>AVPlayer</code>也可以用来播放<code>MPMediaItem</code>，这两个类的功能比较完善，推荐使用，在使用之前别忘记设置AudioSession；</p></li>
+<li><p><code>MPMediaItem</code>可以得到对应的URL，这个URL可以用来做很多事情，例如用<code>AVAssetReader</code>和<code>AVAssetExportSession</code>可以导出其中的数据；</p></li>
+</ul>
+
+
+<hr />
+
+<h1>下篇预告</h1>
+
+<p>下一篇会讲一些关于NowPlayingCenter和RemoteControl的内容（就是在锁屏界面和ControlCenter中显示的歌曲信息以及上面的那些播放控制按钮）。</p>
+
+<hr />
+
+<h1>参考资料</h1>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40008765">iPod Library Access Programming Guide</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/AboutiPodLibraryAccess/AboutiPodLibraryAccess.html#//apple_ref/doc/uid/TP40008765-CH103-SW9">About iPod Library Access</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingtheMediaItemPicker/UsingtheMediaItemPicker.html#//apple_ref/doc/uid/TP40008765-CH104-SW1">Using the Media Item Picker</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingTheiPodLibrary/UsingTheiPodLibrary.html#//apple_ref/doc/uid/TP40008765-CH101-SW1">Using the iPod Library</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingMediaPlayback/UsingMediaPlayback.html#//apple_ref/doc/uid/TP40008765-CH100-SW1">Using Media Playback</a></p>
+
+<p><a href="http://www.subfurther.com/blog/2010/07/19/from-iphone-media-library-to-pcm-samples-in-dozens-of-confounding-potentially-lossy-steps/">From iPhone Media Library to PCM Samples in Dozens of Confounding, Potentially Lossy Steps</a></p>
+
+<p><a href="http://www.subfurther.com/blog/2010/12/13/from-ipod-library-to-pcm-samples-in-far-fewer-steps-than-were-previously-necessary/">From iPod Library to PCM Samples in Far Fewer Steps Than Were Previously Necessary</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS音频播放 (六)：简单的音频播放器实现]]></title>
@@ -807,7 +1094,7 @@ else
 
 <h1>下篇预告</h1>
 
-<p>下一篇会介绍一下如何播放iOS系统<code>MediaLibrary</code>中的歌曲（俗称iPod音乐或者本地音乐）</p>
+<p>下一篇会介绍一下如何播放iOS系统<code>iPod Library</code>中的歌曲（俗称iPod音乐或者本地音乐）</p>
 ]]></content>
   </entry>
   
@@ -1682,13 +1969,13 @@ extern OSStatus AudioFileClose (AudioFileID inAudioFile);
 
 <p>本来说好是要在第三篇中讲<code>AudioFileStream</code>和<code>AudioQueue</code>，但写着写着发现光<code>AudioFileStream</code>就好多内容，最后还是决定分篇介绍，这篇先来说一下<code>AudioFileStream</code>，下一篇计划说一下和<code>AudioFileStream</code>类似的<code>AudioFile</code>，下下篇再来说<code>AudioQueue</code>。</p>
 
-<p>在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
+<p>在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
 
 <hr />
 
 <h1>AudioFileStream介绍</h1>
 
-<p>在<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>中说到<code>AudioFileStreamer</code>时提到它的作用是用来读取采样率、码率、时长等基本信息以及分离音频帧。那么在<a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW28">官方文档</a>中Apple是这样描述的：</p>
+<p>在<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>中说到<code>AudioFileStreamer</code>时提到它的作用是用来读取采样率、码率、时长等基本信息以及分离音频帧。那么在<a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW28">官方文档</a>中Apple是这样描述的：</p>
 
 <p><code>To play streamed audio content, such as from a network connection, use Audio File Stream Services in concert with Audio Queue Services. Audio File Stream Services parses audio packets and metadata from common audio file container formats in a network bitstream. You can also use it to parse packets and metadata from on-disk files</code></p>
 
@@ -2279,498 +2566,6 @@ extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);
 <p><a href="http://www.cocoawithlove.com/2008/09/streaming-and-playing-live-mp3-stream.html">Streaming and playing an MP3 stream</a></p>
 
 <p><a href="http://www.cocoawithlove.com/2010/03/streaming-mp3aac-audio-again.html">Streaming MP3/AAC audio again</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[iOS音频播放 (二)：AudioSession]]></title>
-    <link href="http://msching.github.io/blog/2014/07/08/audio-in-ios-2/"/>
-    <updated>2014-07-08T13:58:27+08:00</updated>
-    <id>http://msching.github.io/blog/2014/07/08/audio-in-ios-2</id>
-    <content type="html"><![CDATA[<h1>前言</h1>
-
-<p>本篇为《iOS音频播放》系列的第二篇。</p>
-
-<p>在实施<a href="blog/2014/07/07/audio-in-ios/">前一篇</a>中所述的7个步骤之前还必须面对一个麻烦的问题，AudioSession。</p>
-
-<hr />
-
-<h1>AudioSession简介</h1>
-
-<p>AudioSession这个玩意的主要功能包括以下几点（图片来自<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40007875">官方文档</a>）：</p>
-
-<ol>
-<li>确定你的app如何使用音频（是播放？还是录音？）</li>
-<li>为你的app选择合适的输入输出设备（比如输入用的麦克风，输出是耳机、手机功放或者airplay）</li>
-<li>协调你的app的音频播放和系统以及其他app行为（例如有电话时需要打断，电话结束时需要恢复，按下静音按钮时是否歌曲也要静音等）</li>
-</ol>
-
-
-<p><img src="/images/iOS-audio/audiosession.jpg" alt="AudioSession" /></p>
-
-<p>AudioSession相关的类有两个：</p>
-
-<ol>
-<li><code>AudioToolBox</code>中的<code>AudioSession</code></li>
-<li><code>AVFoundation</code>中的<code>AVAudioSession</code></li>
-</ol>
-
-
-<p>其中AudioSession在SDK 7中已经被标注为depracated，而AVAudioSession这个类虽然iOS 3开始就已经存在了，但其中很多方法和变量都是在iOS 6以后甚至是iOS 7才有的。所以各位可以依照以下标准选择：</p>
-
-<ul>
-<li>如果最低版本支持iOS 5，可以使用<code>AudioSession</code>，也可以使用<code>AVAudioSession</code>；</li>
-<li>如果最低版本支持iOS 6及以上，请使用<code>AVAudioSession</code></li>
-</ul>
-
-
-<p>下面以<code>AudioSession</code>类为例来讲述AudioSession相关功能的使用（很不幸我需要支持iOS 5。。T-T，使用<code>AVAudioSession</code>的同学可以在其头文件中寻找对应的方法使用即可，需要注意的点我会加以说明）.</p>
-
-<p><strong>注意：在使用AVAudioPlayer/AVPlayer时可以不用关心AudioSession的相关问题，Apple已经把AudioSession的处理过程封装了，但音乐打断后的响应还是要做的（比如打断后音乐暂停了UI状态也要变化，这个应该通过KVO就可以搞定了吧。。我没试过瞎猜的>_&lt;）。</strong></p>
-
-<hr />
-
-<h1>初始化AudioSession</h1>
-
-<p>使用<code>AudioSession</code>类首先需要调用初始化方法：</p>
-
-<p>```objc
-extern OSStatus AudioSessionInitialize(CFRunLoopRef inRunLoop,</p>
-
-<pre><code>                                     CFStringRef inRunLoopMode, 
-                                     AudioSessionInterruptionListener inInterruptionListener,
-                                     void *inClientData);
-</code></pre>
-
-<p>```</p>
-
-<p>前两个参数一般填<code>NULL</code>表示AudioSession运行在主线程上（但并不代表音频的相关处理运行在主线程上，只是AudioSession），第三个参数需要传入一个一个<code>AudioSessionInterruptionListener</code>类型的方法，作为AudioSession被打断时的回调，第四个参数则是代表打断回调时需要附带的对象（即回到方法中的inClientData，如下所示，可以理解为UIView animation中的context）。</p>
-
-<p><code>objc
-typedef void (*AudioSessionInterruptionListener)(void * inClientData, UInt32 inInterruptionState);
-</code></p>
-
-<p>这才刚开始，坑就来了。这里会有两个问题：</p>
-
-<p>第一，AudioSessionInitialize可以被多次执行，但<code>AudioSessionInterruptionListener</code>只能被设置一次，这就意味着这个打断回调方法是一个静态方法，一旦初始化成功以后所有的打断都会回调到这个方法，即便下一次再次调用AudioSessionInitialize并且把另一个静态方法作为参数传入，当打断到来时还是会回调到第一次设置的方法上。</p>
-
-<p>这种场景并不少见，例如你的app既需要播放歌曲又需要录音，当然你不可能知道用户会先调用哪个功能，所以你必须在播放和录音的模块中都调用AudioSessionInitialize注册打断方法，但最终打断回调只会作用在先注册的那个模块中，很蛋疼吧。。。所以对于AudioSession的使用最好的方法是生成一个类单独进行管理，统一接收打断回调并发送自定义的打断通知，在需要用到AudioSession的模块中接收通知并做相应的操作。</p>
-
-<p>Apple也察觉到了这一点，所以在AVAudioSession中首先取消了Initialize方法，改为了单例方法<code>sharedInstance</code>。在iOS 5上所有的打断都需要通过设置<code>id&lt;AVAudioSessionDelegate&gt; delegate</code>并实现回调方法来实现，这同样会有上述的问题，所以在iOS 5使用AVAudioSession下仍然需要一个单独管理AudioSession的类存在。在iOS 6以后Apple终于把打断改成了通知的形式。。这下科学了。</p>
-
-<p>第二，AudioSessionInitialize方法的第四个参数inClientData，也就是回调方法的第一个参数。上面已经说了打断回调是一个静态方法，而这个参数的目的是为了能让回调时拿到context（上下文信息），所以这个inClientData需要是一个有足够长生命周期的对象（当然前提是你确实需要用到这个参数），如果这个对象被dealloc了，那么回调时拿到的inClientData会是一个野指针。就这一点来说构造一个单独管理AudioSession的类也是有必要的，因为这个类的生命周期和AudioSession一样长，我们可以把context保存在这个类中。</p>
-
-<hr />
-
-<h1>监听RouteChange事件</h1>
-
-<p>如果想要实现类似于“拔掉耳机就把歌曲暂停”的功能就需要监听RouteChange事件：</p>
-
-<p>```objc
-extern OSStatus AudioSessionAddPropertyListener(AudioSessionPropertyID inID,</p>
-
-<pre><code>                                              AudioSessionPropertyListener inProc,
-                                              void *inClientData);
-</code></pre>
-
-<p>typedef void (*AudioSessionPropertyListener)(void * inClientData,</p>
-
-<pre><code>                                           AudioSessionPropertyID inID,
-                                           UInt32 inDataSize,
-                                           const void * inData);
-</code></pre>
-
-<p>```</p>
-
-<p>调用上述方法，AudioSessionPropertyID参数传<code>kAudioSessionProperty_AudioRouteChange</code>，AudioSessionPropertyListener参数传对应的回调方法。inClientData参数同AudioSessionInitialize方法。</p>
-
-<p>同样作为静态回调方法还是需要统一管理，接到回调时可以把第一个参数inData转换成<code>CFDictionaryRef</code>并从中获取kAudioSession_AudioRouteChangeKey_Reason键值对应的value（应该是一个CFNumberRef），得到这些信息后就可以发送自定义通知给其他模块进行相应操作(例如<code>kAudioSessionRouteChangeReason_OldDeviceUnavailable</code>就可以用来做“拔掉耳机就把歌曲暂停”)。</p>
-
-<p>```objc
-//AudioSession的AudioRouteChangeReason枚举
-enum {</p>
-
-<pre><code>    kAudioSessionRouteChangeReason_Unknown = 0,
-    kAudioSessionRouteChangeReason_NewDeviceAvailable = 1,
-    kAudioSessionRouteChangeReason_OldDeviceUnavailable = 2,
-    kAudioSessionRouteChangeReason_CategoryChange = 3,
-    kAudioSessionRouteChangeReason_Override = 4,
-    kAudioSessionRouteChangeReason_WakeFromSleep = 6,
-    kAudioSessionRouteChangeReason_NoSuitableRouteForCategory = 7,
-    kAudioSessionRouteChangeReason_RouteConfigurationChange = 8
-};
-</code></pre>
-
-<p>```</p>
-
-<p>```objc
-//AVAudioSession的AudioRouteChangeReason枚举
-typedef NS_ENUM(NSUInteger, AVAudioSessionRouteChangeReason)
-{</p>
-
-<pre><code>AVAudioSessionRouteChangeReasonUnknown = 0,
-AVAudioSessionRouteChangeReasonNewDeviceAvailable = 1,
-AVAudioSessionRouteChangeReasonOldDeviceUnavailable = 2,
-AVAudioSessionRouteChangeReasonCategoryChange = 3,
-AVAudioSessionRouteChangeReasonOverride = 4,
-AVAudioSessionRouteChangeReasonWakeFromSleep = 6,
-AVAudioSessionRouteChangeReasonNoSuitableRouteForCategory = 7,
-AVAudioSessionRouteChangeReasonRouteConfigurationChange NS_ENUM_AVAILABLE_IOS(7_0) = 8
-</code></pre>
-
-<p>}
-```</p>
-
-<p><strong>注意：iOS 5下如果使用了<code>AVAudioSession</code>由于<code>AVAudioSessionDelegate</code>中并没有定义相关的方法，还是需要用这个方法来实现监听。iOS 6下直接监听AVAudioSession的通知就可以了。</strong></p>
-
-<hr />
-
-<p>这里附带两个方法的实现，都是基于<code>AudioSession</code>类的（使用<code>AVAudioSession</code>的同学帮不到你们啦）。</p>
-
-<p>1、判断是否插了耳机：</p>
-
-<p>```objc
-+ (BOOL)usingHeadset
-{</p>
-
-<h1>if TARGET_IPHONE_SIMULATOR</h1>
-
-<pre><code>return NO;
-</code></pre>
-
-<h1>endif</h1>
-
-<pre><code>CFStringRef route;
-UInt32 propertySize = sizeof(CFStringRef);
-AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &amp;propertySize, &amp;route);
-
-BOOL hasHeadset = NO;
-if((route == NULL) || (CFStringGetLength(route) == 0))
-{
-    // Silent Mode
-}
-else
-{
-    /* Known values of route:
-     * "Headset"
-     * "Headphone"
-     * "Speaker"
-     * "SpeakerAndMicrophone"
-     * "HeadphonesAndMicrophone"
-     * "HeadsetInOut"
-     * "ReceiverAndMicrophone"
-     * "Lineout"
-     */
-    NSString* routeStr = (__bridge NSString*)route;
-    NSRange headphoneRange = [routeStr rangeOfString : @"Headphone"];
-    NSRange headsetRange = [routeStr rangeOfString : @"Headset"];
-
-    if (headphoneRange.location != NSNotFound)
-    {
-        hasHeadset = YES;
-    }
-    else if(headsetRange.location != NSNotFound)
-    {
-        hasHeadset = YES;
-    }
-}
-
-if (route)
-{
-    CFRelease(route);
-}
-
-return hasHeadset;
-</code></pre>
-
-<p>}</p>
-
-<p>```</p>
-
-<p>2、判断是否开了Airplay(来自<a href="http://stackoverflow.com/questions/13044894/get-name-of-airplay-device-using-avplayer">StackOverflow</a>)：</p>
-
-<p>```objc
-+ (BOOL)isAirplayActived
-{</p>
-
-<pre><code>CFDictionaryRef currentRouteDescriptionDictionary = nil;
-UInt32 dataSize = sizeof(currentRouteDescriptionDictionary);
-AudioSessionGetProperty(kAudioSessionProperty_AudioRouteDescription, &amp;dataSize, &amp;currentRouteDescriptionDictionary);
-
-BOOL airplayActived = NO;
-if (currentRouteDescriptionDictionary)
-{
-    CFArrayRef outputs = CFDictionaryGetValue(currentRouteDescriptionDictionary, kAudioSession_AudioRouteKey_Outputs);
-    if(outputs != NULL &amp;&amp; CFArrayGetCount(outputs) &gt; 0)
-    {
-        CFDictionaryRef currentOutput = CFArrayGetValueAtIndex(outputs, 0);
-        //Get the output type (will show airplay / hdmi etc
-        CFStringRef outputType = CFDictionaryGetValue(currentOutput, kAudioSession_AudioRouteKey_Type);
-
-        airplayActived = (CFStringCompare(outputType, kAudioSessionOutputRoute_AirPlay, 0) == kCFCompareEqualTo);
-    }
-    CFRelease(currentRouteDescriptionDictionary);                
-}
-return airplayActived;
-</code></pre>
-
-<p>}</p>
-
-<p>```</p>
-
-<hr />
-
-<h1>设置类别</h1>
-
-<p>下一步要设置AudioSession的Category，使用<code>AudioSession</code>时调用下面的接口</p>
-
-<p>```objc
-extern OSStatus AudioSessionSetProperty(AudioSessionPropertyID inID,</p>
-
-<pre><code>                                      UInt32 inDataSize,
-                                      const void *inData);
-</code></pre>
-
-<p>```</p>
-
-<p>如果我需要的功能是播放，执行如下代码</p>
-
-<p>```objc
-UInt32 sessionCategory = kAudioSessionCategory_MediaPlayback;
-AudioSessionSetProperty (kAudioSessionProperty_AudioCategory,</p>
-
-<pre><code>                       sizeof(sessionCategory),
-                       &amp;sessionCategory);
-</code></pre>
-
-<p>```</p>
-
-<p>使用<code>AVAudioSession</code>时调用下面的接口</p>
-
-<p><code>objc
-/* set session category */
-- (BOOL)setCategory:(NSString *)category error:(NSError **)outError;
-/* set session category with options */
-- (BOOL)setCategory:(NSString *)category withOptions: (AVAudioSessionCategoryOptions)options error:(NSError **)outError NS_AVAILABLE_IOS(6_0);
-</code></p>
-
-<p>至于Category的类型在<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/AudioSessionBasics/AudioSessionBasics.html#//apple_ref/doc/uid/TP40007875-CH3-SW1">官方文档</a>中都有介绍，我这里也只罗列一下具体就不赘述了，各位在使用时可以依照自己需要的功能设置Category。</p>
-
-<p>```objc
-//AudioSession的AudioSessionCategory枚举
-enum {</p>
-
-<pre><code>    kAudioSessionCategory_AmbientSound               = 'ambi',
-    kAudioSessionCategory_SoloAmbientSound           = 'solo',
-    kAudioSessionCategory_MediaPlayback              = 'medi',
-    kAudioSessionCategory_RecordAudio                = 'reca',
-    kAudioSessionCategory_PlayAndRecord              = 'plar',
-    kAudioSessionCategory_AudioProcessing            = 'proc'
-};
-</code></pre>
-
-<p>```</p>
-
-<p>```objc
-//AudioSession的AudioSessionCategory字符串
-/<em>  Use this category for background sounds such as rain, car engine noise, etc.<br/>
- Mixes with other music. </em>/
-AVF_EXPORT NSString *const AVAudioSessionCategoryAmbient;</p>
-
-<p>/<em>  Use this category for background sounds.  Other music will stop playing. </em>/
-AVF_EXPORT NSString *const AVAudioSessionCategorySoloAmbient;</p>
-
-<p>/<em> Use this category for music tracks.</em>/
-AVF_EXPORT NSString *const AVAudioSessionCategoryPlayback;</p>
-
-<p>/<em>  Use this category when recording audio. </em>/
-AVF_EXPORT NSString *const AVAudioSessionCategoryRecord;</p>
-
-<p>/<em>  Use this category when recording and playing back audio. </em>/
-AVF_EXPORT NSString *const AVAudioSessionCategoryPlayAndRecord;</p>
-
-<p>/<em>  Use this category when using a hardware codec or signal processor while
- not playing or recording audio. </em>/
-AVF_EXPORT NSString *const AVAudioSessionCategoryAudioProcessing;</p>
-
-<p>```</p>
-
-<hr />
-
-<h1>启用</h1>
-
-<p>有了Category就可以启动AudioSession了，启动方法：</p>
-
-<p>```objc
-//AudioSession的启动方法
-extern OSStatus AudioSessionSetActive(Boolean active);
-extern OSStatus AudioSessionSetActiveWithFlags(Boolean active, UInt32 inFlags);</p>
-
-<p>//AVAudioSession的启动方法
-&ndash; (BOOL)setActive:(BOOL)active error:(NSError <strong>)outError;
-&ndash; (BOOL)setActive:(BOOL)active withFlags:(NSInteger)flags error:(NSError </strong>)outError NS_DEPRECATED_IOS(4_0, 6_0);
-&ndash; (BOOL)setActive:(BOOL)active withOptions:(AVAudioSessionSetActiveOptions)options error:(NSError **)outError NS_AVAILABLE_IOS(6_0);
-```
-启动方法调用后必须要判断是否启动成功，启动不成功的情况经常存在，例如一个前台的app正在播放，你的app正在后台想要启动AudioSession那就会返回失败。</p>
-
-<p>一般情况下我们在启动和停止AudioSession调用第一个方法就可以了。但如果你正在做一个即时语音通讯app的话（类似于微信、易信）就需要注意在deactive AudioSession的时候需要使用第二个方法，inFlags参数传入<code>kAudioSessionSetActiveFlag_NotifyOthersOnDeactivation</code>（<code>AVAudioSession</code>给options参数传入<code>AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation</code>）。当你的app deactive自己的AudioSession时系统会通知上一个被打断播放app打断结束（就是上面说到的打断回调），如果你的app在deactive时传入了NotifyOthersOnDeactivation参数，那么其他app在接到打断结束回调时会多得到一个参数<code>kAudioSessionInterruptionType_ShouldResume</code>否则就是ShouldNotResume（<code>AVAudioSessionInterruptionOptionShouldResume</code>），根据参数的值可以决定是否继续播放。</p>
-
-<p>大概流程是这样的：</p>
-
-<ol>
-<li>一个音乐软件A正在播放；</li>
-<li>用户打开你的软件播放对话语音，AudioSession active；</li>
-<li>音乐软件A音乐被打断并收到InterruptBegin事件；</li>
-<li>对话语音播放结束，AudioSession deactive并且传入NotifyOthersOnDeactivation参数；</li>
-<li>音乐软件A收到InterruptEnd事件，查看Resume参数，如果是ShouldResume控制音频继续播放，如果是ShouldNotResume就维持打断状态；</li>
-</ol>
-
-
-<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/ConfiguringanAudioSession/ConfiguringanAudioSession.html#//apple_ref/doc/uid/TP40007875-CH2-SW1">官方文档</a>中有一张很形象的图来阐述这个现象：</p>
-
-<p><img src="/images/iOS-audio/audiosession-active.jpg" alt="" /></p>
-
-<p>然而现在某些语音通讯软件和某些音乐软件却无视了<code>NotifyOthersOnDeactivation</code>和<code>ShouldResume</code>的正确用法，导致我们经常接到这样的用户反馈：</p>
-
-<pre><code>你们的app在使用xx语音软件听了一段话后就不会继续播放了，但xx音乐软件可以继续播放啊。
-</code></pre>
-
-<p>好吧，上面只是吐槽一下。请无视我吧。</p>
-
-<p><strong>2014.7.14补充，7.19更新：</strong></p>
-
-<p>发现即使之前已经调用过<code>AudioSessionInitialize</code>方法，在某些情况下被打断之后可能出现AudioSession失效的情况，需要再次调用<code>AudioSessionInitialize</code>方法来重新生成AudioSession。否则调用<code>AudioSessionSetActive</code>会返回560557673（其他AudioSession方法也雷同，所有方法调用前必须首先初始化AudioSession），转换成string后为"!ini"即<code>kAudioSessionNotInitialized</code>，这个情况在iOS 5.1.x上比较容易发生，iOS 6.x 和 7.x也偶有发生（<del>具体的原因还不知晓</del>好像和打断时直接调用<code>AudioOutputUnitStop</code>有关，又是个坑啊）。</p>
-
-<p>所以每次在调用<code>AudioSessionSetActive</code>时应该判断一下错误码，如果是上述的错误码需要重新初始化一下AudioSession。</p>
-
-<p>附上OSStatus转成string的方法：</p>
-
-<p>```objc</p>
-
-<h1>import &lt;Endian.h></h1>
-
-<p>NSString * OSStatusToString(OSStatus status)
-{</p>
-
-<pre><code>size_t len = sizeof(UInt32);
-long addr = (unsigned long)&amp;status;
-char cstring[5];
-
-len = (status &gt;&gt; 24) == 0 ? len - 1 : len;
-len = (status &gt;&gt; 16) == 0 ? len - 1 : len;
-len = (status &gt;&gt;  8) == 0 ? len - 1 : len;
-len = (status &gt;&gt;  0) == 0 ? len - 1 : len;
-
-addr += (4 - len);
-
-status = EndianU32_NtoB(status);        // strings are big endian
-
-strncpy(cstring, (char *)addr, len);
-cstring[len] = 0;
-
-return [NSString stringWithCString:(char *)cstring encoding:NSMacOSRomanStringEncoding];
-</code></pre>
-
-<p>}
-```</p>
-
-<hr />
-
-<h1>打断处理</h1>
-
-<p>正常启动AudioSession之后就可以播放音频了，下面要讲的是对于打断的处理。之前我们说到打断的回调在iOS 5下需要统一管理，在收到打断开始和结束时需要发送自定义的通知。</p>
-
-<p>使用<code>AudioSession</code>时打断回调应该首先获取<code>kAudioSessionProperty_InterruptionType</code>，然后发送一个自定义的通知并带上对应的参数。</p>
-
-<p>```objc
-static void MyAudioSessionInterruptionListener(void *inClientData, UInt32 inInterruptionState)
-{</p>
-
-<pre><code>AudioSessionInterruptionType interruptionType = kAudioSessionInterruptionType_ShouldNotResume;
-UInt32 interruptionTypeSize = sizeof(interruptionType);
-AudioSessionGetProperty(kAudioSessionProperty_InterruptionType,
-                        &amp;interruptionTypeSize,
-                        &amp;interruptionType);
-
-NSDictionary *userInfo = @{MyAudioInterruptionStateKey:@(inInterruptionState),
-                             MyAudioInterruptionTypeKey:@(interruptionType)};
-
-[[NSNotificationCenter defaultCenter] postNotificationName:MyAudioInterruptionNotification object:nil userInfo:userInfo];
-</code></pre>
-
-<p>}
-```</p>
-
-<p>收到通知后的处理方法如下（注意ShouldResume参数）：</p>
-
-<p>```objc
-&ndash; (void)interruptionNotificationReceived:(NSNotification *)notification
-{</p>
-
-<pre><code>UInt32 interruptionState = [notification.userInfo[MyAudioInterruptionStateKey] unsignedIntValue];
-AudioSessionInterruptionType interruptionType = [notification.userInfo[MyAudioInterruptionTypeKey] unsignedIntValue];
-[self handleAudioSessionInterruptionWithState:interruptionState type:interruptionType];
-</code></pre>
-
-<p>}</p>
-
-<ul>
-<li>(void)handleAudioSessionInterruptionWithState:(UInt32)interruptionState type:(AudioSessionInterruptionType)interruptionType
-{
-  if (interruptionState == kAudioSessionBeginInterruption)
-  {
-      //控制UI，暂停播放
-  }
-  else if (interruptionState == kAudioSessionEndInterruption)
-  {
-      if (interruptionType == kAudioSessionInterruptionType_ShouldResume)
-      {
-          OSStatus status = AudioSessionSetActive(true);
-          if (status == noErr)
-          {
-              //控制UI，继续播放
-          }
-      }
-  }
-}
-```</li>
-</ul>
-
-
-<hr />
-
-<h1>小结</h1>
-
-<p>关于AudioSession的话题到此结束（码字果然很累。。）。小结一下：</p>
-
-<ul>
-<li>如果最低版本支持iOS 5，可以使用<code>AudioSession</code>也可以考虑使用<code>AVAudioSession</code>，需要有一个类统一管理AudioSession的所有回调，在接到回调后发送对应的自定义通知；</li>
-<li>如果最低版本支持iOS 6及以上，请使用<code>AVAudioSession</code>，不用统一管理，接AVAudioSession的通知即可；</li>
-<li>根据app的应用场景合理选择<code>Category</code>；</li>
-<li>在deactive时需要注意app的应用场景来合理的选择是否使用<code>NotifyOthersOnDeactivation</code>参数；</li>
-<li>在处理InterruptEnd事件时需要注意<code>ShouldResume</code>的值。</li>
-</ul>
-
-
-<hr />
-
-<h1>示例代码</h1>
-
-<p><a href="https://github.com/msching/MCAudioSession">这里</a>有我自己写的<code>AudioSession</code>的封装，如果各位需要支持iOS 5的话可以使用一下。</p>
-
-<hr />
-
-<h1>下篇预告</h1>
-
-<p><del>下一篇将讲述如何使用<code>AudioFileStreamer</code>分离音频帧，以及如何使用<code>AudioQueue</code>进行播放。</del></p>
-
-<p>下一篇将讲述如何使用<code>AudioFileStreamer</code>提取音频文件格式信息和分离音频帧。</p>
-
-<hr />
-
-<h1>参考资料</h1>
-
-<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/AudioSessionProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40007875">AudioSession</a></p>
 ]]></content>
   </entry>
   

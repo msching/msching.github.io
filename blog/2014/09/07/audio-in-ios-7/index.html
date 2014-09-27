@@ -1,0 +1,536 @@
+
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>iOS音频播放 (七)：播放iPod Library中的歌曲 - 码农人生</title>
+	<meta name="author" content="ChengYinZju">
+
+	
+	<meta name="description" content="Sep 7th, 2014 Audio, iOS iOS音频播放 (七)：播放iPod Library中的歌曲 Audio Playback in iOS (Part 7) : Access iPod Library 前言 由于最近工作量非常饱和，所以这第七篇来的有点晚（创建时间是9月7日。。 &hellip;">
+	
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<link href="/atom.xml" rel="alternate" title="码农人生" type="application/atom+xml">
+	
+	<link rel="canonical" href="http://msching.github.io/blog/2014/09/07/audio-in-ios-7/">
+	<link href="/favicon.png" rel="shortcut icon">
+	<link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+	<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+	<!--[good job! gfw]><script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><!-->
+	<script src="http://cdn.staticfile.org/jquery/1.9.1/jquery.min.js"></script>
+	<link href="/stylesheets/google-fonts.css" rel="stylesheet" type="text/css">
+	
+</head>
+
+
+<body>
+	<div class="container">
+		<div class="left-col">
+			<div class="intrude-less">
+			<header id="header" class="inner"><div class="profilepic">	
+	<script src="/javascripts/md5.js"></script>
+	<script type="text/javascript">
+		document.write("<img alt='Profile Picture' src='/images/avatar.png' style='width:160px;'/>");
+	</script>
+</div>
+<h1><a href="/">码农人生</a></h1>
+<p class="subtitle">ChengYin's coding life</p>
+<nav id="main-nav"><ul class="main">
+    <li><a href="/">主页  Blog</a></li>
+    <li><a href="/blog/categories">分类  Categories</a></li>
+    <li><a href="/blog/archives">归档  Archives</a></li>
+    <li><a href="/aboutme">关于  About</a></li>
+</ul></nav>
+<nav id="sub-nav">
+	<div class="social">
+		
+		<a class="weibo" href="http://www.weibo.com/msching" title="Weibo">Weibo</a>
+		
+		
+		
+		
+		
+		<a class="github" href="https://github.com/msching" title="GitHub">GitHub</a>
+		
+		
+		
+		
+		
+		
+		
+		<a class="rss" href="/atom.xml" title="RSS">RSS</a>
+		
+	</div>
+</nav>
+<p class="description">Where there is a will, there is a way. -- Thomas Edison</p>
+</header>				
+			</div>
+		</div>	
+		<div class="mid-col">
+			
+				
+			
+			<div class="mid-col-container">
+				<div id="content" class="inner"><article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-09-07T15:45:47+08:00" data-updated="true" itemprop="datePublished">Sep 7<span>th</span>, 2014</time></div>
+		<div class="tags">
+
+
+	<a class='category' href='/blog/categories/audio/'>Audio</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>
+
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name">iOS音频播放 (七)：播放iPod Library中的歌曲</h1>
+	<p class="subtitle" itemprop="name">Audio Playback in iOS (Part 7) : Access iPod Library</p>
+	<hr />
+	<div class="entry-content" itemprop="articleBody"><h1>前言</h1>
+
+<p>由于最近工作量非常饱和，所以这第七篇来的有点晚（创建时间是9月7日。。说出来都是泪）。</p>
+
+<p>现在市面上的音乐播放器都支持iPod Library歌曲（俗称iPod音乐或者本地音乐）的播放，用户对于iPod音乐播放的需求也一直十分强烈。这篇要讲的是如何来播放iPod Library的歌曲。</p>
+
+<hr />
+
+<h1>概述</h1>
+
+<p>根据<a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW43">官方文档</a>描述Apple从iOS 3.0开始允许开发者访问用户的iPod library来获取用户放在其中的歌曲等多媒体内容。</p>
+
+<p>为此Apple提供了多种方法来访问和播放iPod中的音乐，下面我们来分别列举一下这些方法。</p>
+
+<hr />
+
+<h1>访问MediaLibrary</h1>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/AboutiPodLibraryAccess/AboutiPodLibraryAccess.html#//apple_ref/doc/uid/TP40008765-CH103-SW9">官方文档</a>访问iPod Library的方法有两种，分别是MediaPicker和MediaQuery。</p>
+
+<p><img src="/images/iOS-audio/iPodLibraryAccessOverview.jpg" alt="" /></p>
+
+<h3>MediaPicker</h3>
+
+<p>MediaPicker是一个高度封装的iPod Library访问方式，通过使用<code>MPMediaPickerController</code>类来访问iPod Library。这是一个UI控件，用户可以根据需要选择其中的音乐。这个类使用时非常方便，只需要生成一个&#8220;的实例，设置一下属性和delegate后present出来，接下来只要等待回调即可，在回调时需要手动dismiss picker。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">MPMediaPickerController</span> <span class="o">*</span><span class="n">picker</span> <span class="o">=</span> <span class="p">[[</span><span class="n">MPMediaPickerController</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithMediaTypes:</span><span class="n">MPMediaTypeAnyAudio</span><span class="p">];</span>
+</span><span class='line'><span class="n">picker</span><span class="p">.</span><span class="n">prompt</span> <span class="o">=</span> <span class="s">@&quot;请选择需要播放的歌曲&quot;</span><span class="p">;</span>
+</span><span class='line'><span class="n">picker</span><span class="p">.</span><span class="n">showsCloudItems</span> <span class="o">=</span> <span class="n">NO</span><span class="p">;</span>
+</span><span class='line'><span class="n">picker</span><span class="p">.</span><span class="n">allowsPickingMultipleItems</span> <span class="o">=</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'><span class="n">picker</span><span class="p">.</span><span class="n">delegate</span> <span class="o">=</span> <span class="n">self</span><span class="p">;</span>
+</span><span class='line'><span class="p">[</span><span class="n">self</span> <span class="nl">presentViewController:</span><span class="n">picker</span> <span class="nl">animated:</span><span class="n">YES</span> <span class="nl">completion:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">mediaPickerDidCancel:</span><span class="p">(</span><span class="n">MPMediaPickerController</span> <span class="o">*</span><span class="p">)</span><span class="nv">mediaPicker</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">mediaPicker</span> <span class="nl">dismissViewControllerAnimated:</span><span class="n">YES</span> <span class="nl">completion:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">mediaPicker:</span><span class="p">(</span><span class="n">MPMediaPickerController</span> <span class="o">*</span><span class="p">)</span><span class="nv">mediaPicker</span> <span class="nf">didPickMediaItems:</span><span class="p">(</span><span class="n">MPMediaItemCollection</span> <span class="o">*</span><span class="p">)</span><span class="nv">mediaItemCollection</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="p">[</span><span class="n">mediaPicker</span> <span class="nl">dismissViewControllerAnimated:</span><span class="n">YES</span> <span class="nl">completion:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>    <span class="c1">//do something</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>上面的代码将会得到如下的效果：</p>
+
+<p><img src="/images/iOS-audio/MediaPicker.jpg" alt="" /></p>
+
+<p>通过MediaPicker最终可以得到<code>MPMediaItemCollection</code>，其中存放着所有在Picker中选中的歌曲，每一个歌曲使用一个<code>MPMediaItem</code>对象表示。对于MediaPicker的使用也可以参考<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingtheMediaItemPicker/UsingtheMediaItemPicker.html#//apple_ref/doc/uid/TP40008765-CH104-SW1">官方文档</a>。</p>
+
+<h3>MediaQuery</h3>
+
+<p>如果你觉得MeidaPicker的功能或者UI不能满足你的要求那么可以使用MediaQuery。MediaQuery可以直接访问iPod Library的DB，并根据需要获取数据。<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingTheiPodLibrary/UsingTheiPodLibrary.html#//apple_ref/doc/uid/TP40008765-CH101-SW1">官方文档</a>给出了MediaQuery的示意图。</p>
+
+<p><img src="/images/iOS-audio/database_access_classes.jpg" alt="" /></p>
+
+<p>MediaQuery功能十分强大，它可以根据一个或多个条件查询满足需要的MediaItem。</p>
+
+<p>你可以使用<code>MPMediaQuery</code>的类方法来生成一些已经预置了条件的Query</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">// Base queries which can be used directly or as the basis for custom queries.</span>
+</span><span class='line'><span class="c1">// The groupingType for these queries is preset to the appropriate type for the query.</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">albumsQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">artistsQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">songsQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">playlistsQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">podcastsQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">audiobooksQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">compilationsQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">composersQuery</span><span class="p">;</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nf">genresQuery</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>也可以自己生成<code>MPMediaPredicate</code>设置条件，并把它加到Query中，最后通过items和collections访问查询到的结果，例如：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">MPMediaPropertyPredicate</span> <span class="o">*</span><span class="n">artistNamePredicate</span> <span class="o">=</span>
+</span><span class='line'><span class="p">[</span><span class="n">MPMediaPropertyPredicate</span> <span class="nl">predicateWithValue:</span><span class="s">@&quot;Happy the Clown&quot;</span>
+</span><span class='line'>                                 <span class="nl">forProperty:</span><span class="n">MPMediaItemPropertyArtist</span>
+</span><span class='line'>                              <span class="nl">comparisonType:</span><span class="n">MPMediaPredicateComparisonEqualTo</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="n">quert</span> <span class="o">=</span> <span class="p">[[</span><span class="n">MPMediaQuery</span> <span class="n">alloc</span><span class="p">]</span> <span class="n">init</span><span class="p">];</span>
+</span><span class='line'><span class="p">[</span><span class="n">quert</span> <span class="nl">addFilterPredicate:</span> <span class="n">artistNamePredicate</span><span class="p">];</span>
+</span><span class='line'><span class="n">quert</span><span class="p">.</span><span class="n">groupingType</span> <span class="o">=</span> <span class="n">MPMediaGroupingArtist</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">NSArray</span> <span class="o">*</span><span class="n">itemsFromArtistQuery</span> <span class="o">=</span> <span class="p">[</span><span class="n">quert</span> <span class="n">items</span><span class="p">];</span>
+</span><span class='line'><span class="n">NSArray</span> <span class="o">*</span><span class="n">collectionsFromArtistQuery</span> <span class="o">=</span> <span class="p">[</span><span class="n">quert</span> <span class="n">collections</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这一过程可以表示为（图来自<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/AboutiPodLibraryAccess/AboutiPodLibraryAccess.html#//apple_ref/doc/uid/TP40008765-CH103-SW9">官方文档</a>）：</p>
+
+<p><img src="/images/iOS-audio/mediaQuery.jpg" alt="" /></p>
+
+<p>这里对于MediaQuery的用法就不再继续展开，关于这块内容并没有什么晦涩难懂的地方需要解释，大家可以通过阅读<a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingTheiPodLibrary/UsingTheiPodLibrary.html#//apple_ref/doc/uid/TP40008765-CH101-SW1">官方文档</a>来详细了解其用法。</p>
+
+<h3>MediaCollection</h3>
+
+<p><code>MPMediaCollection</code>是MediaItem的合集，可以通过访问它的items属性来访问所有的MediaItem。</p>
+
+<p><code>MPMediaPlaylist</code>是一个特殊的<code>MPMediaCollection</code>代表用户创建的播放列表，它会比MediaCollection包含更多的信息，比如播放列表的名字等等。这些属性可以通过<code>MPMediaEntity</code>的方法访问（MPMediaCollection是MPMediaEntity的子类，MPMediaItem也是）。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">// Returns the value for the given entity property.</span>
+</span><span class='line'><span class="c1">// MPMediaItem and MPMediaPlaylist have their own properties</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">valueForProperty:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">property</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Executes a provided block with the fetched values for the given item properties, or nil if no value is available for a property.</span>
+</span><span class='line'><span class="c1">// In some cases, enumerating the values for multiple properties can be more efficient than fetching each individual property with -valueForProperty:.</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">enumerateValuesForProperties:</span><span class="p">(</span><span class="n">NSSet</span> <span class="o">*</span><span class="p">)</span><span class="nv">properties</span> <span class="nf">usingBlock:</span><span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSString</span> <span class="o">*</span><span class="n">property</span><span class="p">,</span> <span class="kt">id</span> <span class="n">value</span><span class="p">,</span> <span class="kt">BOOL</span> <span class="o">*</span><span class="n">stop</span><span class="p">))</span><span class="nv">block</span> <span class="n">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">4</span><span class="n">_0</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h3>MediaItem</h3>
+
+<p>通过MediaPicker和MediaQuery最终都会得到<code>MPMediaItem</code>，这个item中包含了许多信息。这些信息都可以通过<code>MPMediaEntity</code>的方法访问，其中参数非常多就不列举了具体可以参照MPMediaItem.h。</p>
+
+<hr />
+
+<h1>使用MPMusicPlayerController</h1>
+
+<p>拿到iPod Library中的歌曲后就可以开始播放了。播放的方式有很多种，先介绍一下<code>MediaPlayer framework</code>中的<code>MPMusicPlayerController</code>类。</p>
+
+<p>通过<code>MPMusicPlayerController</code>的类方法可以生成两种播放器，生成方法如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">// Playing media items with the applicationMusicPlayer will restore the user&#39;s iPod state after the application quits.</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMusicPlayerController</span> <span class="o">*</span><span class="p">)</span><span class="nf">applicationMusicPlayer</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Playing media items with the iPodMusicPlayer will replace the user&#39;s current iPod state.</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPMusicPlayerController</span> <span class="o">*</span><span class="p">)</span><span class="nf">iPodMusicPlayer</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这两个方法看似生成了一样的对象，但它们的行为却有很大不同。从Apple写的注释上我们可以很清楚的发现它们的区别。<code>+applicationMusicPlayer</code>不会继承来自iOS系统自带的iPod应用中的播放状态，同时也不会覆盖iPod的播放状态。而<code>+iPodMusicPlayer</code>完全继承iPod应用的播放状态（甚至是播放时间），对其实例的任何操作也会覆盖到iPod应用。对<code>+iPodMusicPlayer</code>方法command+点击后可以看到更详细的注释。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">The</span> <span class="n">iPod</span> <span class="n">music</span> <span class="n">player</span> <span class="n">employs</span> <span class="n">the</span> <span class="n">iPod</span> <span class="n">app</span> <span class="n">on</span> <span class="n">your</span> <span class="n">behalf</span><span class="p">.</span> <span class="n">On</span> <span class="n">instantiation</span><span class="p">,</span> <span class="n">it</span> <span class="n">takes</span> <span class="n">on</span> <span class="n">the</span> <span class="n">current</span> <span class="n">iPod</span> <span class="n">app</span> <span class="n">state</span> <span class="n">and</span> <span class="n">controls</span> <span class="n">that</span> <span class="n">state</span> <span class="n">as</span> <span class="n">your</span> <span class="n">app</span> <span class="n">runs</span><span class="p">.</span> <span class="n">Specifically</span><span class="p">,</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">state</span> <span class="n">includes</span> <span class="n">the</span> <span class="nl">following:</span>
+</span><span class='line'><span class="n">Repeat</span> <span class="n">mode</span> <span class="p">(</span><span class="n">see</span> <span class="err">“</span><span class="n">Repeat</span> <span class="n">Modes</span><span class="err">”</span><span class="p">)</span>
+</span><span class='line'><span class="n">Shuffle</span> <span class="n">mode</span> <span class="p">(</span><span class="n">see</span> <span class="err">“</span><span class="n">Shuffle</span> <span class="n">Modes</span><span class="err">”</span>
+</span><span class='line'><span class="n">Now</span><span class="o">-</span><span class="n">playing</span> <span class="n">item</span> <span class="p">(</span><span class="n">see</span> <span class="n">nowPlayingItem</span><span class="p">)</span>
+</span><span class='line'><span class="n">Playback</span> <span class="n">state</span> <span class="p">(</span><span class="n">see</span> <span class="n">playbackState</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">Other</span> <span class="n">aspects</span> <span class="n">of</span> <span class="n">iPod</span> <span class="n">state</span><span class="p">,</span> <span class="n">such</span> <span class="n">as</span> <span class="n">the</span> <span class="n">on</span><span class="o">-</span><span class="n">the</span><span class="o">-</span><span class="n">go</span> <span class="n">playlist</span><span class="p">,</span> <span class="n">are</span> <span class="n">not</span> <span class="n">shared</span><span class="p">.</span> <span class="n">Music</span> <span class="n">that</span> <span class="n">is</span> <span class="n">playing</span> <span class="n">continues</span> <span class="n">to</span> <span class="n">play</span> <span class="n">when</span> <span class="n">your</span> <span class="n">app</span> <span class="n">moves</span> <span class="n">to</span> <span class="n">the</span> <span class="n">background</span><span class="p">.</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>说白了，当在使用iPodMusicPlayerv其实并不是你的程序在播放音频，而是你的程序在操纵iPod应用播放音频，即使你的程序crash了或者被kill了，音乐也不会因此停止。</p>
+
+<p>而对于<code>+applicationMusicPlayer</code>通过command+点击可以看到：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">The</span> <span class="n">application</span> <span class="n">music</span> <span class="n">player</span> <span class="n">plays</span> <span class="n">music</span> <span class="n">locally</span> <span class="n">within</span> <span class="n">your</span> <span class="n">app</span><span class="p">.</span> <span class="n">It</span> <span class="n">does</span> <span class="n">not</span> <span class="n">affect</span> <span class="n">the</span> <span class="n">iPod</span> <span class="n">state</span><span class="p">.</span>
+</span><span class='line'><span class="n">When</span> <span class="n">your</span> <span class="n">app</span> <span class="n">moves</span> <span class="n">to</span> <span class="n">the</span> <span class="n">background</span><span class="p">,</span> <span class="n">the</span> <span class="n">music</span> <span class="n">player</span> <span class="n">stops</span> <span class="k">if</span> <span class="n">it</span> <span class="n">was</span> <span class="n">playing</span><span class="p">.</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>从注释中可以知道这个方法返回的对象虽然不是调用iPod应用播放的也不会影响到iPod应用，但它有个很大的缺点：无法后台播放，即使你在active了audioSession并且在app的设置中设置了Background Audio同样不会奏效。</p>
+
+<p>综上所述，一般在开发音乐软件时很少用到这两个接口来进行iPod Library的播放，大部分开发者都是用这个类中的volme来调整系统音量的（这个属性在SDK 7中也被deprecate掉了）。如果你想用到这个类进行播放的话，这里需要提个醒，给<code>MPMusicPlayerController</code>设置需要播放的音乐时要使用下面两个方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">// Call -play to begin playback after setting an item queue source. Setting a query will implicitly use MPMediaGroupingTitle.</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setQueueWithQuery:</span><span class="p">(</span><span class="n">MPMediaQuery</span> <span class="o">*</span><span class="p">)</span><span class="nv">query</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setQueueWithItemCollection:</span><span class="p">(</span><span class="n">MPMediaItemCollection</span> <span class="o">*</span><span class="p">)</span><span class="nv">itemCollection</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>而不是这个属性：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">// Returns the currently playing media item, or nil if none is playing.</span>
+</span><span class='line'><span class="c1">// Setting the nowPlayingItem to an item in the current queue will begin playback at that item.</span>
+</span><span class='line'><span class="k">@property</span><span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">MPMediaItem</span> <span class="o">*</span><span class="n">nowPlayingItem</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>光看名字很容易被<code>nowPlayingItem</code>这个属性迷惑，它的意思其实是说在设置了MediaQuery或者MediaCollection之后再设置这个nowPlayingItem可以让播放器从这个item开始播放，前提是这个item需要在MediaQuery或者MediaCollection的.items集合内。</p>
+
+<hr />
+
+<h1>使用AVAudioPlayer和AVPlayer</h1>
+
+<p>除了使用MediaPlayer中的类还有很多其他方法来进行iPod播放，其中做的比较出色的是<code>AVFoundation</code>中的<code>AVAudioPlayer</code>和<code>AVPlayer</code>。</p>
+
+<p>这两个类的都有通过NSURL生成实例的初始化方法：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//AVAudioPlayer</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithContentsOfURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="nf">error:</span><span class="p">(</span><span class="n">NSError</span> <span class="o">**</span><span class="p">)</span><span class="nv">outError</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//AVPlayer</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">playerWithURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">URL</span><span class="p">;</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">id</span><span class="p">)</span><span class="nf">initWithURL:</span><span class="p">(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">URL</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>其中的NSURL正是来自于<code>MPMediaItem</code>的<code>MPMediaItemPropertyAssetURL</code>属性。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">//A URL pointing to the media item,</span>
+</span><span class='line'><span class="c1">//from which an AVAsset object (or other URL-based AV Foundation object) can be created, with any options as desired. </span>
+</span><span class='line'><span class="c1">//Value is an NSURL object.</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPMediaItemPropertyAssetURL</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>上面讲到<code>MPMediaItem</code>时已经提到了它是<code>MPMediaEntity</code>子类，可以通过<code>-valueForProperty:</code>方法访问其中的属性。通过传入<code>MPMediaItemPropertyAssetURL</code>就可以得到当前MediaItem对应的URL（ipod-library://xxxxx），生成Player进行播放。大致代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">@interface</span> <span class="nc">MyClass</span> : <span class="nc">NSObject</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>  <span class="n">AVAudioPlayer</span> <span class="o">*</span><span class="n">_player</span><span class="p">;</span>
+</span><span class='line'>  <span class="c1">//AVPlayer *_player;</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//设置AudioSession</span>
+</span><span class='line'><span class="p">[[</span><span class="n">AVAudioSession</span> <span class="n">sharedInstance</span><span class="p">]</span> <span class="nl">setActive:</span><span class="n">YES</span> <span class="nl">error:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'><span class="p">[[</span><span class="n">AVAudioSession</span> <span class="n">sharedInstance</span><span class="p">]</span> <span class="nl">setCategory:</span><span class="n">AVAudioSessionCategoryPlayback</span> <span class="nl">error:</span><span class="nb">nil</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">//play</span>
+</span><span class='line'><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+</span><span class='line'><span class="n">MPMediaItem</span> <span class="o">*</span><span class="n">item</span> <span class="o">=</span> <span class="p">...;</span>
+</span><span class='line'><span class="n">NSURL</span> <span class="o">*</span><span class="n">url</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span> <span class="nl">valueForProperty:</span><span class="n">MPMediaItemPropertyAssetURL</span><span class="p">];</span>
+</span><span class='line'><span class="n">_player</span> <span class="o">=</span> <span class="p">[[</span><span class="n">AVAudioPlayer</span> <span class="n">alloc</span><span class="p">]</span> <span class="nl">initWithContentsOfURL:</span><span class="n">url</span> <span class="nl">error:</span><span class="o">&amp;</span><span class="n">error</span><span class="p">];</span>
+</span><span class='line'><span class="c1">//_player = [AVPlayer playerWithURL:url];</span>
+</span><span class='line'><span class="p">[</span><span class="n">_player</span> <span class="n">play</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><strong>注意：这里我需要更正一下，之前我在<a href="/blog/2014/07/08/audio-in-ios-2/">第二篇</a>讲到AudioSession时写了这样一段话<code>在使用AVAudioPlayer/AVPlayer时可以不用关心AudioSession的相关问题，Apple已经把AudioSession的处理过程封装了...</code>。这段话不对，我把AVFoundation和Mediaplayer混淆了，在写的时候也没注意，应该是在使用MPMusicPlayerController播放时不需要关心AudioSession的问题。</strong></p>
+
+<hr />
+
+<h1>读取和导出数据</h1>
+
+<p>前面说到使用<code>MPMediaItem</code>的<code>MPMediaItemPropertyAssetURL</code>属性可以得到一个表示当前MediaItem的NSURL，有了这个NSURL我们使用AVFoundation中的类进行播放。播放只是最基本的需求，有了这个URL我们可以做更多更有趣的事情。</p>
+
+<p>在AVFoundation中还有两个有趣的类：<code>AVAssetReader</code>和<code>AVAssetExportSession</code>。它们可以把iPod Library中的指定歌曲以指定的音频格式导出到内存中或者硬盘中，这个指定的格式包括PCM。这是一个激动人心的特性，有了PCM数据我们就可以做很多很多其他的事情了。</p>
+
+<p>这部分如果要展开的话还会有相当多的内容，国外的先辈们早在2010年就已经发掘了这两个类的用法，详细参见<a href="http://www.subfurther.com/blog/2010/07/19/from-iphone-media-library-to-pcm-samples-in-dozens-of-confounding-potentially-lossy-steps/">这里</a>和<a href="http://www.subfurther.com/blog/2010/12/13/from-ipod-library-to-pcm-samples-in-far-fewer-steps-than-were-previously-necessary/">这里</a>。这两篇讲的比较详细并且附有Sample（其中还涉及了一些Extended Audio File Services的内容），如果里面Sample无法下载可以从点击<a href="/files/MediaLibraryExportThrowaway1.zip">MediaLibraryExportThrowaway1.zip</a>和<a href="/files/VTM_AViPodReader.zip">VTM_AViPodReader.zip</a>下载。</p>
+
+<p><strong>需要注意的是在使用<code>AVAssetReader</code>的过程中如果访问系统的相机或者照片可能会使<code>AVAssetReader</code>产生<code>AVErrorOperationInterrupted</code>错误，此时需要重新生成Reader后调用<code>-startReading</code>才可以继续读取数据。</strong></p>
+
+<hr />
+
+<h1>小结</h1>
+
+<p>本篇介绍了一些与iPod Library相关的内容，小结一下：</p>
+
+<ul>
+<li><p>Apple提供两种方法来访问iPod Library，它们分别是<code>MPMediaPickerController</code>和<code>MPMediaQuery</code>；</p></li>
+<li><p><code>MPMediaPickerController</code>和<code>MPMediaQuery</code>最后输出给开发者的对象是<code>MPMediaItem</code>，<code>MPMediaItem</code>的属性需要通过<code>-valueForProperty:</code>方法获取了；</p></li>
+<li><p><code>MPMusicPlayerController</code>可以用来播放<code>MPMediaItem</code>，但有很多局限性，使用时需要根据不同的使用场景来决定用哪个类方法生成实例；</p></li>
+<li><p><code>AVAudioPlayer</code>和<code>AVPlayer</code>也可以用来播放<code>MPMediaItem</code>，这两个类的功能比较完善，推荐使用，在使用之前别忘记设置AudioSession；</p></li>
+<li><p><code>MPMediaItem</code>可以得到对应的URL，这个URL可以用来做很多事情，例如用<code>AVAssetReader</code>和<code>AVAssetExportSession</code>可以导出其中的数据；</p></li>
+</ul>
+
+
+<hr />
+
+<h1>下篇预告</h1>
+
+<p>下一篇会讲一些关于NowPlayingCenter和RemoteControl的内容（就是在锁屏界面和ControlCenter中显示的歌曲信息以及上面的那些播放控制按钮）。</p>
+
+<hr />
+
+<h1>参考资料</h1>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40008765">iPod Library Access Programming Guide</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/AboutiPodLibraryAccess/AboutiPodLibraryAccess.html#//apple_ref/doc/uid/TP40008765-CH103-SW9">About iPod Library Access</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingtheMediaItemPicker/UsingtheMediaItemPicker.html#//apple_ref/doc/uid/TP40008765-CH104-SW1">Using the Media Item Picker</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingTheiPodLibrary/UsingTheiPodLibrary.html#//apple_ref/doc/uid/TP40008765-CH101-SW1">Using the iPod Library</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/Audio/Conceptual/iPodLibraryAccess_Guide/UsingMediaPlayback/UsingMediaPlayback.html#//apple_ref/doc/uid/TP40008765-CH100-SW1">Using Media Playback</a></p>
+
+<p><a href="http://www.subfurther.com/blog/2010/07/19/from-iphone-media-library-to-pcm-samples-in-dozens-of-confounding-potentially-lossy-steps/">From iPhone Media Library to PCM Samples in Dozens of Confounding, Potentially Lossy Steps</a></p>
+
+<p><a href="http://www.subfurther.com/blog/2010/12/13/from-ipod-library-to-pcm-samples-in-far-fewer-steps-than-were-previously-necessary/">From iPod Library to PCM Samples in Far Fewer Steps Than Were Previously Necessary</a></p>
+</div>
+	
+		<br>
+<br>原创文章，版权声明：自由转载-非商用-非衍生-保持署名 | <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.zh">Creative Commons BY-NC-ND 3.0</a></br>
+	
+
+</article>
+
+	<div class="share">
+	<!-- JiaThis Button BEGIN -->
+	<div class="jiathis_style_24x24">
+		<a class="jiathis_button_qzone"></a>
+		<a class="jiathis_button_tsina"></a>
+		<a class="jiathis_button_tqq"></a>
+		<a class="jiathis_button_weixin"></a>
+		<a class="jiathis_button_renren"></a>
+		<a href="http://www.jiathis.com/share?uid=1925419" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+		<a class="jiathis_counter_style"></a>
+	</div>
+	<script type="text/javascript">
+	var jiathis_config = {data_track_clickback:'true'};
+	</script>
+	<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js?uid=1395452865339302" charset="utf-8"></script>
+	<!-- JiaThis Button END -->
+</div>
+
+
+
+<section id="comment">
+    <h1 class="title">Comments</h1>
+    <!-- UY BEGIN -->
+<div id="uyan_frame"></div>
+<script type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1925419"></script>
+<!-- UY END -->
+</section>
+</div>
+			</div>
+			<footer id="footer" class="inner">Copyright &copy; 2014
+
+    ChengYinZju
+
+.
+Powered by <a href="http://octopress.org">Octopress</a>, <a href="https://github.com">GitHub</a>, <a href="https://gitcafe.com">GitCafe</a>.
+<br>Design credit: <a href="http://shashankmehta.in/archive/2012/greyshade.html">Shashank Mehta</a>.</br></footer>
+			<script src="/javascripts/slash.js"></script>
+<script src="/javascripts/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+	$('.fancybox').fancybox();
+})(jQuery);
+</script> <!-- Delete or comment this line to disable Fancybox -->
+
+
+
+
+
+
+		</div>
+	</div>
+</body>
+</html>

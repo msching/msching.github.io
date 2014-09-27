@@ -107,13 +107,13 @@
 
 <p>本来说好是要在第三篇中讲<code>AudioFileStream</code>和<code>AudioQueue</code>，但写着写着发现光<code>AudioFileStream</code>就好多内容，最后还是决定分篇介绍，这篇先来说一下<code>AudioFileStream</code>，下一篇计划说一下和<code>AudioFileStream</code>类似的<code>AudioFile</code>，下下篇再来说<code>AudioQueue</code>。</p>
 
-<p>在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
+<p>在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
 
 <hr />
 
 <h1>AudioFileStream介绍</h1>
 
-<p>在<a href="blog/2014/07/07/audio-in-ios/">第一篇</a>中说到<code>AudioFileStreamer</code>时提到它的作用是用来读取采样率、码率、时长等基本信息以及分离音频帧。那么在<a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW28">官方文档</a>中Apple是这样描述的：</p>
+<p>在<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>中说到<code>AudioFileStreamer</code>时提到它的作用是用来读取采样率、码率、时长等基本信息以及分离音频帧。那么在<a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW28">官方文档</a>中Apple是这样描述的：</p>
 
 <p><code>To play streamed audio content, such as from a network connection, use Audio File Stream Services in concert with Audio Queue Services. Audio File Stream Services parses audio packets and metadata from common audio file container formats in a network bitstream. You can also use it to parse packets and metadata from on-disk files</code></p>
 
