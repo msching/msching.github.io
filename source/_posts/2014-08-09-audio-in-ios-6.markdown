@@ -696,5 +696,5 @@ if (_stopRequired)
 
 #下篇预告
 
-下一篇会介绍一下如何播放iOS系统`MediaLibrary`中的歌曲（俗称iPod音乐或者本地音乐）
+下一篇会介绍一下如何播放iOS系统`iPod Library`中的歌曲（俗称iPod音乐或者本地音乐）
 

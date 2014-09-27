@@ -13,7 +13,7 @@ categories: [iOS,Audio]
 
 本篇为《iOS音频播放》系列的第二篇。
 
-在实施[前一篇](blog/2014/07/07/audio-in-ios/)中所述的7个步骤之前还必须面对一个麻烦的问题，AudioSession。
+在实施[前一篇](/blog/2014/07/07/audio-in-ios/)中所述的7个步骤之前还必须面对一个麻烦的问题，AudioSession。
 
 ----
 
@@ -39,7 +39,9 @@ AudioSession相关的类有两个：
 
 下面以`AudioSession`类为例来讲述AudioSession相关功能的使用（很不幸我需要支持iOS 5。。T-T，使用`AVAudioSession`的同学可以在其头文件中寻找对应的方法使用即可，需要注意的点我会加以说明）.
 
-**注意：在使用AVAudioPlayer/AVPlayer时可以不用关心AudioSession的相关问题，Apple已经把AudioSession的处理过程封装了，但音乐打断后的响应还是要做的（比如打断后音乐暂停了UI状态也要变化，这个应该通过KVO就可以搞定了吧。。我没试过瞎猜的>_<）。**
+~~**注意：在使用AVAudioPlayer/AVPlayer时可以不用关心AudioSession的相关问题，Apple已经把AudioSession的处理过程封装了，但音乐打断后的响应还是要做的（比如打断后音乐暂停了UI状态也要变化，这个应该通过KVO就可以搞定了吧。。我没试过瞎猜的>_<）。**~~
+
+**注意：在使用`MPMusicPlayerController`时不必关心AudioSession的问题。**
 
 ----
 
