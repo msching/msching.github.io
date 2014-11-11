@@ -1,0 +1,601 @@
+
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>iOS音频播放 (八)：NowPlayingCenter和RemoteControl - 码农人生</title>
+	<meta name="author" content="ChengYinZju">
+
+	
+	<meta name="description" content="Nov 6th, 2014 Audio, iOS, iOS Audio iOS音频播放 (八)：NowPlayingCenter和RemoteControl Audio Playback in iOS (Part 8) : NowPlayingCenter & RemoteControl 前言 &hellip;">
+	
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<link href="/atom.xml" rel="alternate" title="码农人生" type="application/atom+xml">
+	
+	<link rel="canonical" href="http://msching.github.io/blog/2014/11/06/audio-in-ios-8/">
+	<link href="/favicon.png" rel="shortcut icon">
+	<link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+	<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+	<!--[good job! gfw]><script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><!-->
+	<script src="http://cdn.staticfile.org/jquery/1.9.1/jquery.min.js"></script>
+	<link href="/stylesheets/google-fonts.css" rel="stylesheet" type="text/css">
+	
+</head>
+
+
+<body>
+	<div class="container">
+		<div class="left-col">
+			<div class="intrude-less">
+			<header id="header" class="inner"><div class="profilepic">	
+	<script src="/javascripts/md5.js"></script>
+	<script type="text/javascript">
+		document.write("<img alt='Profile Picture' src='/images/avatar.png' style='width:160px;'/>");
+	</script>
+</div>
+<h1><a href="/">码农人生</a></h1>
+<p class="subtitle">ChengYin's coding life</p>
+<nav id="main-nav"><ul class="main">
+    <li><a href="/">主页  Blog</a></li>
+    <li><a href="/blog/categories">分类  Categories</a></li>
+    <li><a href="/blog/archives">归档  Archives</a></li>
+    <li><a href="/aboutme">关于  About</a></li>
+</ul></nav>
+<nav id="sub-nav">
+	<div class="social">
+		
+		<a class="weibo" href="http://www.weibo.com/msching" title="Weibo">Weibo</a>
+		
+		
+		
+		
+		
+		<a class="github" href="https://github.com/msching" title="GitHub">GitHub</a>
+		
+		
+		
+		
+		
+		
+		
+		<a class="rss" href="/atom.xml" title="RSS">RSS</a>
+		
+	</div>
+</nav>
+<p class="description">Where there is a will, there is a way. -- Thomas Edison</p>
+</header>				
+			</div>
+		</div>	
+		<div class="mid-col">
+			
+				
+			
+			<div class="mid-col-container">
+				<div id="content" class="inner"><article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-11-06T13:26:28+08:00" data-updated="true" itemprop="datePublished">Nov 6<span>th</span>, 2014</time></div>
+		<div class="tags">
+
+
+	<a class='category' href='/blog/categories/audio/'>Audio</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>, <a class='category' href='/blog/categories/ios-audio/'>iOS Audio</a>
+
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name">iOS音频播放 (八)：NowPlayingCenter和RemoteControl</h1>
+	<p class="subtitle" itemprop="name">Audio Playback in iOS (Part 8) : NowPlayingCenter & RemoteControl</p>
+	<hr />
+	<div class="entry-content" itemprop="articleBody"><h1>前言</h1>
+
+<p>距离<a href="/blog/2014/09/07/audio-in-ios-7/">上一篇</a>博文发布已经有一个月多的时间了，在这其间我一直忙于筹办婚礼以至于这篇博文一直拖到了现在。</p>
+
+<p>在之前<a href="/blog/categories/ios-audio/">一到六篇</a>中我对iOS下的音频播放流程进行了阐述，在<a href="/blog/2014/09/07/audio-in-ios-7/">第七篇</a>中介绍了如何播放iPod Lib中的歌曲，至此有关音频播放的话题就已经完结了，在这篇里我将会讲到的<code>NowPlayingCenter</code>和<code>RemoteControl</code>这两个玩意本身和整个播放流程并没有什么关系，但它们可以让音频播放在iOS系统上获得更加好的用户体验。</p>
+
+<hr />
+
+<h1>NowPlayingCenter</h1>
+
+<p><code>NowPlayingCenter</code>能够显示当前正在播放的歌曲信息，它可以控制的范围包括：</p>
+
+<ul>
+<li>锁频界面上所显示的歌曲播放信息和图片</li>
+<li>iOS7之后控制中心上显示的歌曲播放信息</li>
+<li>iOS7之前双击home键后出现的进程中向左滑动出现的歌曲播放信息</li>
+<li>AppleTV，AirPlay中显示的播放信息</li>
+<li>车载系统中显示的播放信息</li>
+</ul>
+
+
+<p>这些信息的显示都由<code>MPNowPlayingInfoCenter</code>类来控制，这个类的定义非常简单：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">MP_EXTERN_CLASS_AVAILABLE</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">)</span> <span class="k">@interface</span> <span class="nc">MPNowPlayingInfoCenter</span> : <span class="nc">NSObject</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Returns the default now playing info center.</span>
+</span><span class='line'><span class="c1">// The default center holds now playing info about the current application.</span>
+</span><span class='line'><span class="k">+</span> <span class="p">(</span><span class="n">MPNowPlayingInfoCenter</span> <span class="o">*</span><span class="p">)</span><span class="nf">defaultCenter</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The current now playing info for the center.</span>
+</span><span class='line'><span class="c1">// Setting the info to nil will clear it.</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">copy</span><span class="p">)</span> <span class="n">NSDictionary</span> <span class="o">*</span><span class="n">nowPlayingInfo</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>使用也同样简单，首先<code>#import &lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>然后调用<code>MPNowPlayingInfoCenter</code>的单例方法获取实例，再把需要显示的信息组织成Dictionary并复制给<code>nowPlayingInfo</code>属性就完成了。</p>
+
+<p><code>nowPlayingInfo</code>中一些常用属性被定义在<code>&lt;MediaPlayer/MPMediaItem.h&gt;</code>中</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">MPMediaItemPropertyAlbumTitle</span>              <span class="c1">//NSString</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyAlbumTrackCount</span>         <span class="c1">//NSNumber of NSUInteger</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyAlbumTrackNumber</span>        <span class="c1">//NSNumber of NSUInteger</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyArtist</span>                  <span class="c1">//NSString</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyArtwork</span>                 <span class="c1">//MPMediaItemArtwork</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyComposer</span>                <span class="c1">//NSString</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyDiscCount</span>               <span class="c1">//NSNumber of NSUInteger</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyDiscNumber</span>              <span class="c1">//NSNumber of NSUInteger</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyGenre</span>                   <span class="c1">//NSString</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyPersistentID</span>            <span class="c1">//NSNumber of uint64_t</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyPlaybackDuration</span>        <span class="c1">//NSNumber of NSTimeInterval</span>
+</span><span class='line'><span class="n">MPMediaItemPropertyTitle</span>                   <span class="c1">//NSString</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>上面这些属性大多比较浅显易懂，基本上按照字面上的意思去理解就可以了，需要稍微解释以下的是<code>MPMediaItemPropertyArtwork</code>。这个属性表示的是锁屏界面或者AirPlay中显示的歌曲封面图，<code>MPMediaItemArtwork</code>类可以由<code>UIImage</code>类进行初始化。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">MP_EXTERN_CLASS_AVAILABLE</span><span class="p">(</span><span class="mi">3</span><span class="n">_0</span><span class="p">)</span> <span class="k">@interface</span> <span class="nc">MPMediaItemArtwork</span> : <span class="nc">NSObject</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Initializes an MPMediaItemArtwork instance with the given full-size image.</span>
+</span><span class='line'><span class="c1">// The crop rect of the image is assumed to be equal to the bounds of the </span>
+</span><span class='line'><span class="c1">// image as defined by the image&#39;s size in points, i.e. tightly cropped.</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">instancetype</span><span class="p">)</span><span class="nf">initWithImage:</span><span class="p">(</span><span class="n">UIImage</span> <span class="o">*</span><span class="p">)</span><span class="nv">image</span> <span class="n">NS_DESIGNATED_INITIALIZER</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Returns the artwork image for an item at a given size (in points).</span>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="n">UIImage</span> <span class="o">*</span><span class="p">)</span><span class="nf">imageWithSize:</span><span class="p">(</span><span class="n">CGSize</span><span class="p">)</span><span class="nv">size</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">readonly</span><span class="p">)</span> <span class="n">CGRect</span> <span class="n">bounds</span><span class="p">;</span> <span class="c1">// The bounds of the full size image (in points).</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">readonly</span><span class="p">)</span> <span class="n">CGRect</span> <span class="n">imageCropRect</span><span class="p">;</span> <span class="c1">// The actual content area of the artwork, in the bounds of the full size image (in points).</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>另外一些附加属性被定义在<code>&lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>中</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">// The elapsed time of the now playing item, in seconds.</span>
+</span><span class='line'><span class="c1">// Note the elapsed time will be automatically extrapolated from the previously </span>
+</span><span class='line'><span class="c1">// provided elapsed time and playback rate, so updating this property frequently</span>
+</span><span class='line'><span class="c1">// is not required (or recommended.)</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPNowPlayingInfoPropertyElapsedPlaybackTime</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">);</span> <span class="c1">// NSNumber (double)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The playback rate of the now playing item, with 1.0 representing normal </span>
+</span><span class='line'><span class="c1">// playback. For example, 2.0 would represent playback at twice the normal rate.</span>
+</span><span class='line'><span class="c1">// If not specified, assumed to be 1.0.</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPNowPlayingInfoPropertyPlaybackRate</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">);</span> <span class="c1">// NSNumber (double)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The &quot;default&quot; playback rate of the now playing item. You should set this</span>
+</span><span class='line'><span class="c1">// property if your app is playing a media item at a rate other than 1.0 in a</span>
+</span><span class='line'><span class="c1">// default playback state. e.g., if you are playing back content at a rate of</span>
+</span><span class='line'><span class="c1">// 2.0 and your playback state is not fast-forwarding, then the default</span>
+</span><span class='line'><span class="c1">// playback rate should also be 2.0. Conversely, if you are playing back content</span>
+</span><span class='line'><span class="c1">// at a normal rate (1.0) but the user is fast-forwarding your content at a rate</span>
+</span><span class='line'><span class="c1">// greater than 1.0, then the default playback rate should be set to 1.0.</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPNowPlayingInfoPropertyDefaultPlaybackRate</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">8</span><span class="n">_0</span><span class="p">);</span> <span class="c1">// NSNumber (double)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The index of the now playing item in the application&#39;s playback queue.</span>
+</span><span class='line'><span class="c1">// Note that the queue uses zero-based indexing, so the index of the first item </span>
+</span><span class='line'><span class="c1">// would be 0 if the item should be displayed as &quot;item 1 of 10&quot;.</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPNowPlayingInfoPropertyPlaybackQueueIndex</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">);</span> <span class="c1">// NSNumber (NSUInteger)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The total number of items in the application&#39;s playback queue.</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPNowPlayingInfoPropertyPlaybackQueueCount</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">);</span> <span class="c1">// NSNumber (NSUInteger)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The chapter currently being played. Note that this is zero-based.</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPNowPlayingInfoPropertyChapterNumber</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">);</span> <span class="c1">// NSNumber (NSUInteger)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The total number of chapters in the now playing item.</span>
+</span><span class='line'><span class="n">MP_EXTERN</span> <span class="n">NSString</span> <span class="o">*</span><span class="k">const</span> <span class="n">MPNowPlayingInfoPropertyChapterCount</span> <span class="nf">NS_AVAILABLE_IOS</span><span class="p">(</span><span class="mi">5</span><span class="n">_0</span><span class="p">);</span> <span class="c1">// NSNumber (NSUInteger)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>其中常用的是<code>MPNowPlayingInfoPropertyElapsedPlaybackTime</code>和<code>MPNowPlayingInfoPropertyPlaybackRate</code>：</p>
+
+<ul>
+<li><code>MPNowPlayingInfoPropertyElapsedPlaybackTime</code>表示已经播放的时间，用这个属性可以让<code>NowPlayingCenter</code>显示播放进度；</li>
+<li><code>MPNowPlayingInfoPropertyPlaybackRate</code>表示播放速率。通常情况下播放速率为1.0，即真是时间的1秒对应播放时间中的1秒；</li>
+</ul>
+
+
+<p>这里需要解释的是，<code>NowPlayingCenter</code>中的进度刷新并不是由app不停的更新<code>nowPlayingInfo</code>来做的，而是根据app传入的<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>进行自动刷新。例如传入ElapsedPlaybackTime=120s，PlaybackRate=1.0，那么<code>NowPlayingCenter</code>会显示2:00并且在接下来的时间中每一秒把进度加1秒并刷新显示。如果需要暂停进度，传入PlaybackRate=0.0即可。</p>
+
+<p>所以每次播放暂停和继续都需要更新<code>NowPlayingCenter</code>并正确设置<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>否则，<code>NowPlayingCenter</code>中的播放进度无法正常显示。</p>
+
+<h3>NowPlayingCenter的刷新时机</h3>
+
+<p>频繁的刷新<code>NowPlayingCenter</code>并不可取，特别是在有Artwork的情况下。所以需要在合适的时候进行刷新。</p>
+
+<p>依照我自己的经验下面几个情况下刷新<code>NowPlayingCenter</code>比较合适：</p>
+
+<ul>
+<li>当前播放歌曲进度被拖动时</li>
+<li>当前播放的歌曲变化时</li>
+<li>播放暂停或者恢复时</li>
+<li>当前播放歌曲的信息发生变化时（例如Artwork，duration等）</li>
+</ul>
+
+
+<p>在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数</p>
+
+<h3>MPMediaItemPropertyArtwork</h3>
+
+<p>这是一个非常有用的属性，我们可以利用歌曲的封面图来合成一些图片借此达到美化锁屏界面或者显示锁屏歌词。</p>
+
+<hr />
+
+<h1>RemoteControl</h1>
+
+<p><code>RemoteComtrol</code>可以用来在不打开app的情况下控制app中的多媒体播放行为，涉及的内容主要包括：</p>
+
+<ul>
+<li>锁屏界面双击Home键后出现的播放操作区域</li>
+<li>iOS7之后控制中心的播放操作区域</li>
+<li>iOS7之前双击home键后出现的进程中向左滑动出现的播放操作区域</li>
+<li>AppleTV，AirPlay中显示的播放操作区域</li>
+<li>耳机线控</li>
+<li>车载系统的设置</li>
+</ul>
+
+
+<h3>在何处处理RemoteComtrol</h3>
+
+<p>根据<a href="https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html">官方文档</a>的描述：</p>
+
+<p><code>If your app plays audio or video content, you might want it to respond to remote control events that originate from either transport controls or external accessories. (External accessories must conform to Apple-provided specifications.) iOS converts commands into UIEvent objects and delivers the events to an app. The app sends them to the first responder and, if the first responder doesn’t handle them, they travel up the responder chain.</code></p>
+
+<p>当<code>RemoteComtrol</code>事件产生时，iOS会以<code>UIEvent</code>的形式发送给app，app会首先转发到first responder，如果first responder不处理这个事件的话那么事件就会沿着responder chain继续转发。关于responder chain的相关内容可以查看<a href="https://developer.apple.com/library/IOs/documentation/General/Conceptual/Devpedia-CocoaApp/Responder.html">这里</a>。</p>
+
+<p>从responder chain文档看来如果之前的所有responder全部不响应<code>RemoteComtrol</code>事件的话，最终事件会被转发给Application（如图）。所以我们知道作为responder chain的最末端，在<code>UIApplication</code>中实现<code>RemoteComtrol</code>的处理是最为合理的，而并非在UIWindow中或者AppDelegate中。</p>
+
+<p><img src="/images/iOS-audio/responder%20chain.jpg" alt="" /></p>
+
+<h3>实现自己的UIApplication</h3>
+
+<p>首先新建一个<code>UIApplication</code>的子类</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cp">#import &lt;UIKit/UIKit.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@interface</span> <span class="nc">MyApplication</span> : <span class="nc">UIApplication</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后找到工程中的<code>main.m</code>，可以看到代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span> <span class="n">argv</span><span class="p">[])</span> <span class="p">{</span>
+</span><span class='line'>    <span class="err">@</span><span class="n">autoreleasepool</span> <span class="p">{</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">UIApplicationMain</span><span class="p">(</span><span class="n">argc</span><span class="p">,</span> <span class="n">argv</span><span class="p">,</span> <span class="n">nil</span><span class="p">,</span> <span class="n">NSStringFromClass</span><span class="p">([</span><span class="n">AppDelegate</span> <span class="n">class</span><span class="p">]));</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在main中调用了<code>UIApplicationMain</code>方法</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="c1">// If nil is specified for principalClassName, the value for NSPrincipalClass from the Info.plist is used. If there is no</span>
+</span><span class='line'><span class="c1">// NSPrincipalClass key specified, the UIApplication class is used. The delegate class will be instantiated using init.</span>
+</span><span class='line'><span class="n">UIKIT_EXTERN</span> <span class="kt">int</span> <span class="nf">UIApplicationMain</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span><span class="n">argv</span><span class="p">[],</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">principalClassName</span><span class="p">,</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">delegateClassName</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>我们需要做的就是给<code>UIApplicationMain</code>方法的第三个参数传入我们的application类名，如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#import &lt;UIKit/UIKit.h&gt;</span>
+</span><span class='line'><span class="cp">#import &quot;AppDelegate.h&quot;</span>
+</span><span class='line'><span class="cp">#import &quot;MyApplication.h&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span> <span class="n">argv</span><span class="p">[])</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="err">@</span><span class="n">autoreleasepool</span> <span class="p">{</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">UIApplicationMain</span><span class="p">(</span><span class="n">argc</span><span class="p">,</span> <span class="n">argv</span><span class="p">,</span> <span class="n">NSStringFromClass</span><span class="p">([</span><span class="n">MyApplication</span> <span class="n">class</span><span class="p">]),</span> <span class="n">NSStringFromClass</span><span class="p">([</span><span class="n">AppDelegate</span> <span class="n">class</span><span class="p">]));</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这样就成功实现了自己的<code>UIApplication</code>.</p>
+
+<h3>处理RemoteComtrol</h3>
+
+<p>了解了应该在何处处理<code>RemoteComtrol</code>事件之后，再来看下<a href="https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html">官方文档</a>中描述的三个必要条件：</p>
+
+<ul>
+<li>接受者必须能够成为first responder</li>
+<li>必须显示地声明接收<code>RemoteComtrol</code>事件</li>
+<li>你的app必须是<code>Now Playing</code>app</li>
+</ul>
+
+
+<p>对于第一条就是要在自己的<code>UIApplication</code>中实现<code>canBecomeFirstResponder</code>方法:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cp">#import &quot;MyApplication.h&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@implementation</span> <span class="nc">MyApplication</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">canBecomeFirstResponder</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>第二条是要求显示地调用<code>[[UIApplication sharedApplication] beginReceivingRemoteControlEvents]</code>，调用的实际一般是在播放开始时；</p>
+
+<p>第三条就是要求占据NowPlayingCenter，这个之前已经提到过了。</p>
+
+<p>满足三个条件后可以在<code>UIApplication</code>中实现处理<code>RemoteComtrol</code>事件的方法，根据不同的事件实现不同的操作即可。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cp">#import &quot;MyApplication.h&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@implementation</span> <span class="nc">MyApplication</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">BOOL</span><span class="p">)</span><span class="nf">canBecomeFirstResponder</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">YES</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">remoteControlReceivedWithEvent:</span><span class="p">(</span><span class="n">UIEvent</span> <span class="o">*</span><span class="p">)</span><span class="nv">event</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>    <span class="k">switch</span> <span class="p">(</span><span class="n">event</span><span class="p">.</span><span class="n">subtype</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="k">case</span> <span class="nl">UIEventSubtypeRemoteControlPlay:</span>
+</span><span class='line'>            <span class="c1">//play</span>
+</span><span class='line'>            <span class="k">break</span><span class="p">;</span>
+</span><span class='line'>        <span class="k">case</span> <span class="nl">UIEventSubtypeRemoteControlPause:</span>
+</span><span class='line'>            <span class="c1">//pause</span>
+</span><span class='line'>            <span class="k">break</span><span class="p">;</span>
+</span><span class='line'>        <span class="k">case</span> <span class="nl">UIEventSubtypeRemoteControlStop:</span>
+</span><span class='line'>            <span class="c1">//stop</span>
+</span><span class='line'>            <span class="k">break</span><span class="p">;</span>
+</span><span class='line'>        <span class="k">default</span><span class="o">:</span>
+</span><span class='line'>            <span class="k">break</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">@end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>示例代码</h1>
+
+<p>git上有一个关于remotecontrol的小工程供大家参考<a href="https://github.com/MosheBerman/ios-audio-remote-control">ios-audio-remote-control</a></p>
+
+<hr />
+
+<h1>后记</h1>
+
+<p>到本篇为止iOS的音频播放话题基本上算是完结了。接下来我会在空余时间去研究一下iOS 8中新加入的<code>AVAudioEngine</code>，其功能涵盖播放、录音、混音、音效处理，看上去十分强大，从接口的定义上看像是对<code>AudioUnit</code>的高层封装，当研究有了一定的成果之后也会以博文的形式分享出来。</p>
+
+<hr />
+
+<h1>参考资料</h1>
+
+<p><a href="https://encrypted.google.com/url?sa=t&amp;rct=j&amp;q=&amp;esrc=s&amp;source=web&amp;cd=1&amp;ved=0CC4QFjAA&amp;url=https%3A%2F%2Fdeveloper.apple.com%2FLibrary%2Fios%2Fdocumentation%2FMediaPlayer%2FReference%2FMPNowPlayingInfoCenter_Class%2Findex.html&amp;ei=8bBhVO_RF4HKmwXBiILIDA&amp;usg=AFQjCNFOziF2zKft-wGQ3ew_cHy7Ivxrvg">MPNowPlayingInfoCenter</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html">Remote Control Events</a></p>
+
+<p><a href="https://developer.apple.com/library/IOs/documentation/General/Conceptual/Devpedia-CocoaApp/Responder.html">Cocoa Responder Chain</a></p>
+</div>
+	
+		<br>
+<br>原创文章，版权声明：自由转载-非商用-非衍生-保持署名 | <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.zh">Creative Commons BY-NC-ND 3.0</a></br>
+	
+
+</article>
+
+	<div class="share">
+	<!-- JiaThis Button BEGIN -->
+	<div class="jiathis_style_24x24">
+		<a class="jiathis_button_qzone"></a>
+		<a class="jiathis_button_tsina"></a>
+		<a class="jiathis_button_tqq"></a>
+		<a class="jiathis_button_weixin"></a>
+		<a class="jiathis_button_renren"></a>
+		<a href="http://www.jiathis.com/share?uid=1925419" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+		<a class="jiathis_counter_style"></a>
+	</div>
+	<script type="text/javascript">
+	var jiathis_config = {data_track_clickback:'true'};
+	</script>
+	<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js?uid=1395452865339302" charset="utf-8"></script>
+	<!-- JiaThis Button END -->
+</div>
+
+
+
+<section id="comment">
+    <h1 class="title">Comments</h1>
+    <!-- UY BEGIN -->
+<div id="uyan_frame"></div>
+<script type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1925419"></script>
+<!-- UY END -->
+</section>
+</div>
+			</div>
+			<footer id="footer" class="inner">Copyright &copy; 2014
+
+    ChengYinZju
+
+.
+Powered by <a href="http://octopress.org">Octopress</a>, <a href="https://github.com">GitHub</a>, <a href="https://gitcafe.com">GitCafe</a>.
+<br>Design credit: <a href="http://shashankmehta.in/archive/2012/greyshade.html">Shashank Mehta</a>.</br></footer>
+			<script src="/javascripts/slash.js"></script>
+<script src="/javascripts/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+	$('.fancybox').fancybox();
+})(jQuery);
+</script> <!-- Delete or comment this line to disable Fancybox -->
+
+
+
+
+
+
+		</div>
+	</div>
+</body>
+</html>

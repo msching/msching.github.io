@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Audio | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/audio/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-09-27T23:48:24+08:00</updated>
+  <updated>2014-11-11T16:18:14+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,332 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[iOS音频播放 (八)：NowPlayingCenter和RemoteControl]]></title>
+    <link href="http://msching.github.io/blog/2014/11/06/audio-in-ios-8/"/>
+    <updated>2014-11-06T13:26:28+08:00</updated>
+    <id>http://msching.github.io/blog/2014/11/06/audio-in-ios-8</id>
+    <content type="html"><![CDATA[<h1>前言</h1>
+
+<p>距离<a href="/blog/2014/09/07/audio-in-ios-7/">上一篇</a>博文发布已经有一个月多的时间了，在这其间我一直忙于筹办婚礼以至于这篇博文一直拖到了现在。</p>
+
+<p>在之前<a href="/blog/categories/ios-audio/">一到六篇</a>中我对iOS下的音频播放流程进行了阐述，在<a href="/blog/2014/09/07/audio-in-ios-7/">第七篇</a>中介绍了如何播放iPod Lib中的歌曲，至此有关音频播放的话题就已经完结了，在这篇里我将会讲到的<code>NowPlayingCenter</code>和<code>RemoteControl</code>这两个玩意本身和整个播放流程并没有什么关系，但它们可以让音频播放在iOS系统上获得更加好的用户体验。</p>
+
+<hr />
+
+<h1>NowPlayingCenter</h1>
+
+<p><code>NowPlayingCenter</code>能够显示当前正在播放的歌曲信息，它可以控制的范围包括：</p>
+
+<ul>
+<li>锁频界面上所显示的歌曲播放信息和图片</li>
+<li>iOS7之后控制中心上显示的歌曲播放信息</li>
+<li>iOS7之前双击home键后出现的进程中向左滑动出现的歌曲播放信息</li>
+<li>AppleTV，AirPlay中显示的播放信息</li>
+<li>车载系统中显示的播放信息</li>
+</ul>
+
+
+<p>这些信息的显示都由<code>MPNowPlayingInfoCenter</code>类来控制，这个类的定义非常简单：</p>
+
+<p>```objc
+MP_EXTERN_CLASS_AVAILABLE(5_0) @interface MPNowPlayingInfoCenter : NSObject</p>
+
+<p>// Returns the default now playing info center.
+// The default center holds now playing info about the current application.
++ (MPNowPlayingInfoCenter *)defaultCenter;</p>
+
+<p>// The current now playing info for the center.
+// Setting the info to nil will clear it.
+@property (copy) NSDictionary *nowPlayingInfo;</p>
+
+<p>@end
+```</p>
+
+<p>使用也同样简单，首先<code>#import &lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>然后调用<code>MPNowPlayingInfoCenter</code>的单例方法获取实例，再把需要显示的信息组织成Dictionary并复制给<code>nowPlayingInfo</code>属性就完成了。</p>
+
+<p><code>nowPlayingInfo</code>中一些常用属性被定义在<code>&lt;MediaPlayer/MPMediaItem.h&gt;</code>中</p>
+
+<p><code>objc
+MPMediaItemPropertyAlbumTitle                //NSString
+MPMediaItemPropertyAlbumTrackCount          //NSNumber of NSUInteger
+MPMediaItemPropertyAlbumTrackNumber     //NSNumber of NSUInteger
+MPMediaItemPropertyArtist                   //NSString
+MPMediaItemPropertyArtwork                  //MPMediaItemArtwork
+MPMediaItemPropertyComposer             //NSString
+MPMediaItemPropertyDiscCount                //NSNumber of NSUInteger
+MPMediaItemPropertyDiscNumber               //NSNumber of NSUInteger
+MPMediaItemPropertyGenre                    //NSString
+MPMediaItemPropertyPersistentID         //NSNumber of uint64_t
+MPMediaItemPropertyPlaybackDuration     //NSNumber of NSTimeInterval
+MPMediaItemPropertyTitle                    //NSString
+</code></p>
+
+<p>上面这些属性大多比较浅显易懂，基本上按照字面上的意思去理解就可以了，需要稍微解释以下的是<code>MPMediaItemPropertyArtwork</code>。这个属性表示的是锁屏界面或者AirPlay中显示的歌曲封面图，<code>MPMediaItemArtwork</code>类可以由<code>UIImage</code>类进行初始化。</p>
+
+<p>```objc
+MP_EXTERN_CLASS_AVAILABLE(3_0) @interface MPMediaItemArtwork : NSObject</p>
+
+<p>// Initializes an MPMediaItemArtwork instance with the given full-size image.
+// The crop rect of the image is assumed to be equal to the bounds of the
+// image as defined by the image&rsquo;s size in points, i.e. tightly cropped.
+&ndash; (instancetype)initWithImage:(UIImage *)image NS_DESIGNATED_INITIALIZER NS_AVAILABLE_IOS(5_0);</p>
+
+<p>// Returns the artwork image for an item at a given size (in points).
+&ndash; (UIImage *)imageWithSize:(CGSize)size;</p>
+
+<p>@property (nonatomic, readonly) CGRect bounds; // The bounds of the full size image (in points).
+@property (nonatomic, readonly) CGRect imageCropRect; // The actual content area of the artwork, in the bounds of the full size image (in points).</p>
+
+<p>@end
+```</p>
+
+<p>另外一些附加属性被定义在<code>&lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>中</p>
+
+<p>```objc
+// The elapsed time of the now playing item, in seconds.
+// Note the elapsed time will be automatically extrapolated from the previously
+// provided elapsed time and playback rate, so updating this property frequently
+// is not required (or recommended.)
+MP_EXTERN NSString *const MPNowPlayingInfoPropertyElapsedPlaybackTime NS_AVAILABLE_IOS(5_0); // NSNumber (double)</p>
+
+<p>// The playback rate of the now playing item, with 1.0 representing normal
+// playback. For example, 2.0 would represent playback at twice the normal rate.
+// If not specified, assumed to be 1.0.
+MP_EXTERN NSString *const MPNowPlayingInfoPropertyPlaybackRate NS_AVAILABLE_IOS(5_0); // NSNumber (double)</p>
+
+<p>// The &ldquo;default&rdquo; playback rate of the now playing item. You should set this
+// property if your app is playing a media item at a rate other than 1.0 in a
+// default playback state. e.g., if you are playing back content at a rate of
+// 2.0 and your playback state is not fast-forwarding, then the default
+// playback rate should also be 2.0. Conversely, if you are playing back content
+// at a normal rate (1.0) but the user is fast-forwarding your content at a rate
+// greater than 1.0, then the default playback rate should be set to 1.0.
+MP_EXTERN NSString *const MPNowPlayingInfoPropertyDefaultPlaybackRate NS_AVAILABLE_IOS(8_0); // NSNumber (double)</p>
+
+<p>// The index of the now playing item in the application&rsquo;s playback queue.
+// Note that the queue uses zero-based indexing, so the index of the first item
+// would be 0 if the item should be displayed as &ldquo;item 1 of 10&rdquo;.
+MP_EXTERN NSString *const MPNowPlayingInfoPropertyPlaybackQueueIndex NS_AVAILABLE_IOS(5_0); // NSNumber (NSUInteger)</p>
+
+<p>// The total number of items in the application&rsquo;s playback queue.
+MP_EXTERN NSString *const MPNowPlayingInfoPropertyPlaybackQueueCount NS_AVAILABLE_IOS(5_0); // NSNumber (NSUInteger)</p>
+
+<p>// The chapter currently being played. Note that this is zero-based.
+MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterNumber NS_AVAILABLE_IOS(5_0); // NSNumber (NSUInteger)</p>
+
+<p>// The total number of chapters in the now playing item.
+MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(5_0); // NSNumber (NSUInteger)
+<code>``
+其中常用的是</code>MPNowPlayingInfoPropertyElapsedPlaybackTime<code>和</code>MPNowPlayingInfoPropertyPlaybackRate`：</p>
+
+<ul>
+<li><code>MPNowPlayingInfoPropertyElapsedPlaybackTime</code>表示已经播放的时间，用这个属性可以让<code>NowPlayingCenter</code>显示播放进度；</li>
+<li><code>MPNowPlayingInfoPropertyPlaybackRate</code>表示播放速率。通常情况下播放速率为1.0，即真是时间的1秒对应播放时间中的1秒；</li>
+</ul>
+
+
+<p>这里需要解释的是，<code>NowPlayingCenter</code>中的进度刷新并不是由app不停的更新<code>nowPlayingInfo</code>来做的，而是根据app传入的<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>进行自动刷新。例如传入ElapsedPlaybackTime=120s，PlaybackRate=1.0，那么<code>NowPlayingCenter</code>会显示2:00并且在接下来的时间中每一秒把进度加1秒并刷新显示。如果需要暂停进度，传入PlaybackRate=0.0即可。</p>
+
+<p>所以每次播放暂停和继续都需要更新<code>NowPlayingCenter</code>并正确设置<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>否则，<code>NowPlayingCenter</code>中的播放进度无法正常显示。</p>
+
+<h3>NowPlayingCenter的刷新时机</h3>
+
+<p>频繁的刷新<code>NowPlayingCenter</code>并不可取，特别是在有Artwork的情况下。所以需要在合适的时候进行刷新。</p>
+
+<p>依照我自己的经验下面几个情况下刷新<code>NowPlayingCenter</code>比较合适：</p>
+
+<ul>
+<li>当前播放歌曲进度被拖动时</li>
+<li>当前播放的歌曲变化时</li>
+<li>播放暂停或者恢复时</li>
+<li>当前播放歌曲的信息发生变化时（例如Artwork，duration等）</li>
+</ul>
+
+
+<p>在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数</p>
+
+<h3>MPMediaItemPropertyArtwork</h3>
+
+<p>这是一个非常有用的属性，我们可以利用歌曲的封面图来合成一些图片借此达到美化锁屏界面或者显示锁屏歌词。</p>
+
+<hr />
+
+<h1>RemoteControl</h1>
+
+<p><code>RemoteComtrol</code>可以用来在不打开app的情况下控制app中的多媒体播放行为，涉及的内容主要包括：</p>
+
+<ul>
+<li>锁屏界面双击Home键后出现的播放操作区域</li>
+<li>iOS7之后控制中心的播放操作区域</li>
+<li>iOS7之前双击home键后出现的进程中向左滑动出现的播放操作区域</li>
+<li>AppleTV，AirPlay中显示的播放操作区域</li>
+<li>耳机线控</li>
+<li>车载系统的设置</li>
+</ul>
+
+
+<h3>在何处处理RemoteComtrol</h3>
+
+<p>根据<a href="https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html">官方文档</a>的描述：</p>
+
+<p><code>If your app plays audio or video content, you might want it to respond to remote control events that originate from either transport controls or external accessories. (External accessories must conform to Apple-provided specifications.) iOS converts commands into UIEvent objects and delivers the events to an app. The app sends them to the first responder and, if the first responder doesn’t handle them, they travel up the responder chain.</code></p>
+
+<p>当<code>RemoteComtrol</code>事件产生时，iOS会以<code>UIEvent</code>的形式发送给app，app会首先转发到first responder，如果first responder不处理这个事件的话那么事件就会沿着responder chain继续转发。关于responder chain的相关内容可以查看<a href="https://developer.apple.com/library/IOs/documentation/General/Conceptual/Devpedia-CocoaApp/Responder.html">这里</a>。</p>
+
+<p>从responder chain文档看来如果之前的所有responder全部不响应<code>RemoteComtrol</code>事件的话，最终事件会被转发给Application（如图）。所以我们知道作为responder chain的最末端，在<code>UIApplication</code>中实现<code>RemoteComtrol</code>的处理是最为合理的，而并非在UIWindow中或者AppDelegate中。</p>
+
+<p><img src="/images/iOS-audio/responder%20chain.jpg" alt="" /></p>
+
+<h3>实现自己的UIApplication</h3>
+
+<p>首先新建一个<code>UIApplication</code>的子类</p>
+
+<p>```objc</p>
+
+<h1>import &lt;UIKit/UIKit.h></h1>
+
+<p>@interface MyApplication : UIApplication</p>
+
+<p>@end
+```</p>
+
+<p>然后找到工程中的<code>main.m</code>，可以看到代码如下：</p>
+
+<p>```c
+int main(int argc, char * argv[]) {</p>
+
+<pre><code>@autoreleasepool {
+    return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
+}
+</code></pre>
+
+<p>}
+<code>``
+在main中调用了</code>UIApplicationMain`方法</p>
+
+<p><code>objc
+// If nil is specified for principalClassName, the value for NSPrincipalClass from the Info.plist is used. If there is no
+// NSPrincipalClass key specified, the UIApplication class is used. The delegate class will be instantiated using init.
+UIKIT_EXTERN int UIApplicationMain(int argc, char *argv[], NSString *principalClassName, NSString *delegateClassName);
+</code></p>
+
+<p>我们需要做的就是给<code>UIApplicationMain</code>方法的第三个参数传入我们的application类名，如下：</p>
+
+<p>```c</p>
+
+<h1>import &lt;UIKit/UIKit.h></h1>
+
+<h1>import &ldquo;AppDelegate.h&rdquo;</h1>
+
+<h1>import &ldquo;MyApplication.h&rdquo;</h1>
+
+<p>int main(int argc, char * argv[])
+{</p>
+
+<pre><code>@autoreleasepool {
+    return UIApplicationMain(argc, argv, NSStringFromClass([MyApplication class]), NSStringFromClass([AppDelegate class]));
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>这样就成功实现了自己的<code>UIApplication</code>.</p>
+
+<h3>处理RemoteComtrol</h3>
+
+<p>了解了应该在何处处理<code>RemoteComtrol</code>事件之后，再来看下<a href="https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html">官方文档</a>中描述的三个必要条件：</p>
+
+<ul>
+<li>接受者必须能够成为first responder</li>
+<li>必须显示地声明接收<code>RemoteComtrol</code>事件</li>
+<li>你的app必须是<code>Now Playing</code>app</li>
+</ul>
+
+
+<p>对于第一条就是要在自己的<code>UIApplication</code>中实现<code>canBecomeFirstResponder</code>方法:</p>
+
+<p>```objc</p>
+
+<h1>import &ldquo;MyApplication.h&rdquo;</h1>
+
+<p>@implementation MyApplication</p>
+
+<ul>
+<li>(BOOL)canBecomeFirstResponder
+{
+  return YES;
+}</li>
+</ul>
+
+
+<p>@end
+<code>``
+第二条是要求显示地调用</code>[[UIApplication sharedApplication] beginReceivingRemoteControlEvents]`，调用的实际一般是在播放开始时；</p>
+
+<p>第三条就是要求占据NowPlayingCenter，这个之前已经提到过了。</p>
+
+<p>满足三个条件后可以在<code>UIApplication</code>中实现处理<code>RemoteComtrol</code>事件的方法，根据不同的事件实现不同的操作即可。</p>
+
+<p>```objc</p>
+
+<h1>import &ldquo;MyApplication.h&rdquo;</h1>
+
+<p>@implementation MyApplication</p>
+
+<ul>
+<li><p>(BOOL)canBecomeFirstResponder
+{
+  return YES;
+}</p></li>
+<li><p>(void)remoteControlReceivedWithEvent:(UIEvent *)event
+{
+  switch (event.subtype)
+  {
+      case UIEventSubtypeRemoteControlPlay:
+            //play
+          break;
+      case UIEventSubtypeRemoteControlPause:
+            //pause
+          break;
+      case UIEventSubtypeRemoteControlStop:
+            //stop
+          break;
+      default:
+          break;
+  }
+}</p></li>
+</ul>
+
+
+<p>@end
+```</p>
+
+<hr />
+
+<h1>示例代码</h1>
+
+<p>git上有一个关于remotecontrol的小工程供大家参考<a href="https://github.com/MosheBerman/ios-audio-remote-control">ios-audio-remote-control</a></p>
+
+<hr />
+
+<h1>后记</h1>
+
+<p>到本篇为止iOS的音频播放话题基本上算是完结了。接下来我会在空余时间去研究一下iOS 8中新加入的<code>AVAudioEngine</code>，其功能涵盖播放、录音、混音、音效处理，看上去十分强大，从接口的定义上看像是对<code>AudioUnit</code>的高层封装，当研究有了一定的成果之后也会以博文的形式分享出来。</p>
+
+<hr />
+
+<h1>参考资料</h1>
+
+<p><a href="https://encrypted.google.com/url?sa=t&amp;rct=j&amp;q=&amp;esrc=s&amp;source=web&amp;cd=1&amp;ved=0CC4QFjAA&amp;url=https%3A%2F%2Fdeveloper.apple.com%2FLibrary%2Fios%2Fdocumentation%2FMediaPlayer%2FReference%2FMPNowPlayingInfoCenter_Class%2Findex.html&amp;ei=8bBhVO_RF4HKmwXBiILIDA&amp;usg=AFQjCNFOziF2zKft-wGQ3ew_cHy7Ivxrvg">MPNowPlayingInfoCenter</a></p>
+
+<p><a href="https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html">Remote Control Events</a></p>
+
+<p><a href="https://developer.apple.com/library/IOs/documentation/General/Conceptual/Devpedia-CocoaApp/Responder.html">Cocoa Responder Chain</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS音频播放 (七)：播放iPod Library中的歌曲]]></title>
@@ -1957,615 +2283,6 @@ extern OSStatus AudioFileClose (AudioFileID inAudioFile);
 <h1>参考资料</h1>
 
 <p><a href="https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL">Audio File Services Reference</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[iOS音频播放 (三)：AudioFileStream]]></title>
-    <link href="http://msching.github.io/blog/2014/07/09/audio-in-ios-3/"/>
-    <updated>2014-07-09T11:31:28+08:00</updated>
-    <id>http://msching.github.io/blog/2014/07/09/audio-in-ios-3</id>
-    <content type="html"><![CDATA[<h1>前言</h1>
-
-<p>本来说好是要在第三篇中讲<code>AudioFileStream</code>和<code>AudioQueue</code>，但写着写着发现光<code>AudioFileStream</code>就好多内容，最后还是决定分篇介绍，这篇先来说一下<code>AudioFileStream</code>，下一篇计划说一下和<code>AudioFileStream</code>类似的<code>AudioFile</code>，下下篇再来说<code>AudioQueue</code>。</p>
-
-<p>在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>），具体讲到duration和seek时会再进行说明。</p>
-
-<hr />
-
-<h1>AudioFileStream介绍</h1>
-
-<p>在<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>中说到<code>AudioFileStreamer</code>时提到它的作用是用来读取采样率、码率、时长等基本信息以及分离音频帧。那么在<a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW28">官方文档</a>中Apple是这样描述的：</p>
-
-<p><code>To play streamed audio content, such as from a network connection, use Audio File Stream Services in concert with Audio Queue Services. Audio File Stream Services parses audio packets and metadata from common audio file container formats in a network bitstream. You can also use it to parse packets and metadata from on-disk files</code></p>
-
-<p>根据Apple的描述<code>AudioFileStreamer</code>用在流播放中，当然不仅限于网络流，本地文件同样可以用它来读取信息和分离音频帧。<code>AudioFileStreamer</code>的主要数据是文件数据而不是文件路径，所以数据的读取需要使用者自行实现，</p>
-
-<p>支持的文件格式有：</p>
-
-<ul>
-<li>MPEG-1 Audio Layer 3, used for .mp3 files</li>
-<li>MPEG-2 ADTS, used for the .aac audio data format</li>
-<li>AIFC</li>
-<li>AIFF</li>
-<li>CAF</li>
-<li>MPEG-4, used for .m4a, .mp4, and .3gp files</li>
-<li>NeXT</li>
-<li>WAVE</li>
-</ul>
-
-
-<p>上述格式是iOS、MacOSX所支持的音频格式，这类格式可以被系统提供的API解码，如果想要解码其他的音频格式（如OGG、APE、FLAC）就需要自己实现解码器了。</p>
-
-<hr />
-
-<h1>初始化AudioFileStream</h1>
-
-<p>第一步，自然是要生成一个<code>AudioFileStream</code>的实例：
-```objc
-extern OSStatus AudioFileStreamOpen (void * inClientData,</p>
-
-<pre><code>                                   AudioFileStream_PropertyListenerProc inPropertyListenerProc,
-                                   AudioFileStream_PacketsProc inPacketsProc,
-                                   AudioFileTypeID inFileTypeHint,
-                                   AudioFileStreamID * outAudioFileStream);
-</code></pre>
-
-<p>```
-第一个参数和之前的AudioSession的初始化方法一样是一个上下文对象；</p>
-
-<p>第二个参数<code>AudioFileStream_PropertyListenerProc</code>是歌曲信息解析的回调，每解析出一个歌曲信息都会进行一次回调；</p>
-
-<p>第三个参数<code>AudioFileStream_PacketsProc</code>是分离帧的回调，每解析出一部分帧就会进行一次回调；</p>
-
-<p>第四个参数<code>AudioFileTypeID</code>是文件类型的提示，这个参数来帮助<code>AudioFileStream</code>对文件格式进行解析。这个参数在文件信息不完整（例如信息有缺陷）时尤其有用，它可以给与<code>AudioFileStream</code>一定的提示，帮助其绕过文件中的错误或者缺失从而成功解析文件。所以在确定文件类型的情况下建议各位还是填上这个参数，如果无法确定可以传入0（原理上应该和<a href="/blog/2014/05/04/secret-of-avaudioplayer/">这篇博文</a>近似）；</p>
-
-<p>```objc
-//AudioFileTypeID枚举
-enum {</p>
-
-<pre><code>    kAudioFileAIFFType              = 'AIFF',
-    kAudioFileAIFCType              = 'AIFC',
-    kAudioFileWAVEType              = 'WAVE',
-    kAudioFileSoundDesigner2Type    = 'Sd2f',
-    kAudioFileNextType              = 'NeXT',
-    kAudioFileMP3Type               = 'MPG3',   // mpeg layer 3
-    kAudioFileMP2Type               = 'MPG2',   // mpeg layer 2
-    kAudioFileMP1Type               = 'MPG1',   // mpeg layer 1
-      kAudioFileAC3Type             = 'ac-3',
-    kAudioFileAAC_ADTSType          = 'adts',
-    kAudioFileMPEG4Type            = 'mp4f',
-    kAudioFileM4AType              = 'm4af',
-    kAudioFileM4BType              = 'm4bf',
-      kAudioFileCAFType             = 'caff',
-      kAudioFile3GPType             = '3gpp',
-      kAudioFile3GP2Type                = '3gp2',       
-      kAudioFileAMRType             = 'amrf'        
-</code></pre>
-
-<p>};
-```</p>
-
-<p>第五个参数是返回的AudioFileStream实例对应的<code>AudioFileStreamID</code>，这个ID需要保存起来作为后续一些方法的参数使用；</p>
-
-<p>返回值用来判断是否成功初始化（OSStatus == noErr）。</p>
-
-<hr />
-
-<h1>解析数据</h1>
-
-<p>在初始化完成之后，只要拿到文件数据就可以进行解析了。解析时调用方法：</p>
-
-<p>```objc
-extern OSStatus AudioFileStreamParseBytes(AudioFileStreamID inAudioFileStream,</p>
-
-<pre><code>                                        UInt32 inDataByteSize,
-                                        const void* inData,
-                                        UInt32 inFlags);
-</code></pre>
-
-<p><code>``
-第一个参数</code>AudioFileStreamID`，即初始化时返回的ID；</p>
-
-<p>第二个参数inDataByteSize，本次解析的数据长度；</p>
-
-<p>第三个参数inData，本次解析的数据；</p>
-
-<p>第四个参数是说本次的解析和上一次解析是否是连续的关系，如果是连续的传入0，否则传入<code>kAudioFileStreamParseFlag_Discontinuity</code>。</p>
-
-<p>这里需要插入解释一下何谓“连续”。在第一篇中我们提到过形如MP3的数据都以帧的形式存在的，解析时也需要以帧为单位解析。但在解码之前我们不可能知道每个帧的边界在第几个字节，所以就会出现这样的情况：我们传给AudioFileStreamParseBytes的数据在解析完成之后会有一部分数据余下来，这部分数据是接下去那一帧的前半部分，如果再次有数据输入需要继续解析时就必须要用到前一次解析余下来的数据才能保证帧数据完整，所以在正常播放的情况下传入0即可。目前知道的需要传入<code>kAudioFileStreamParseFlag_Discontinuity</code>的情况有两个，一个是在<strong>seek完毕之后</strong>显然seek后的数据和之前的数据完全无关；另一个是开源播放器<a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>的作者@Matt Gallagher曾在自己的<a href="http://www.cocoawithlove.com/2008/09/streaming-and-playing-live-mp3-stream.html">blog</a>中提到过的：</p>
-
-<p><code>the Audio File Stream Services hit me with a nasty bug: AudioFileStreamParseBytes will crash when trying to parse a streaming MP3.</code></p>
-
-<p><code>In this case, if we pass the kAudioFileStreamParseFlag_Discontinuity flag to AudioFileStreamParseBytes on every invocation between receiving kAudioFileStreamProperty_ReadyToProducePackets and the first successful call to MyPacketsProc, then AudioFileStreamParseBytes will be extra cautious in its approach and won't crash.</code></p>
-
-<p>Matt发布这篇blog是在2008年，这个Bug年代相当久远了，而且原因未知，究竟是否修复也不得而知，而且由于环境不同（比如测试用的mp3文件和所处的iOS系统）无法重现这个问题，所以我个人觉得还是按照Matt的work around在回调得到<code>kAudioFileStreamProperty_ReadyToProducePackets</code>之后，在正常解析第一帧之前都传入<code>kAudioFileStreamParseFlag_Discontinuity</code>比较好。</p>
-
-<p>回到之前的内容，<code>AudioFileStreamParseBytes</code>方法的返回值表示当前的数据是否被正常解析，如果OSStatus的值不是noErr则表示解析不成功，其中错误码包括：</p>
-
-<p>```objc
-enum
-{</p>
-
-<pre><code>kAudioFileStreamError_UnsupportedFileType       = 'typ?',
-kAudioFileStreamError_UnsupportedDataFormat     = 'fmt?',
-kAudioFileStreamError_UnsupportedProperty       = 'pty?',
-kAudioFileStreamError_BadPropertySize           = '!siz',
-kAudioFileStreamError_NotOptimized              = 'optm',
-kAudioFileStreamError_InvalidPacketOffset       = 'pck?',
-kAudioFileStreamError_InvalidFile               = 'dta?',
-kAudioFileStreamError_ValueUnknown              = 'unk?',
-kAudioFileStreamError_DataUnavailable           = 'more',
-kAudioFileStreamError_IllegalOperation          = 'nope',
-kAudioFileStreamError_UnspecifiedError          = 'wht?',
-kAudioFileStreamError_DiscontinuityCantRecover  = 'dsc!'
-</code></pre>
-
-<p>};</p>
-
-<p><code>``
-大多数都可以从字面上理解，需要提一下的是</code>kAudioFileStreamError_NotOptimized`，文档上是这么说的：</p>
-
-<p><code>It is not possible to produce output packets because the file's packet table or other defining info is either not present or is after the audio data.</code></p>
-
-<p>它的含义是说这个音频文件的文件头不存在或者说文件头可能在文件的末尾，当前无法正常Parse，换句话说就是这个文件需要全部下载完才能播放，无法流播。</p>
-
-<p><strong>注意<code>AudioFileStreamParseBytes</code>方法每一次调用都应该注意返回值，一旦出现错误就可以不必继续Parse了。</strong></p>
-
-<hr />
-
-<h1>解析文件格式信息</h1>
-
-<p>在调用<code>AudioFileStreamParseBytes</code>方法进行解析时会首先读取格式信息，并同步的进入<code>AudioFileStream_PropertyListenerProc</code>回调方法</p>
-
-<p><img src="/images/iOS-audio/audiofilestreamParse-1.jpg" alt="" /></p>
-
-<p>来看一下这个回调方法的定义
-```objc
-typedef void (*AudioFileStream_PropertyListenerProc)(void * inClientData,</p>
-
-<pre><code>                                                   AudioFileStreamID inAudioFileStream,
-                                                   AudioFileStreamPropertyID inPropertyID,
-                                                   UInt32 * ioFlags);
-</code></pre>
-
-<p>```</p>
-
-<p>回调的第一个参数是Open方法中的上下文对象；</p>
-
-<p>第二个参数inAudioFileStream是和Open方法中第四个返回参数<code>AudioFileStreamID</code>一样，表示当前FileStream的ID；</p>
-
-<p>第三个参数是此次回调解析的信息ID。表示当前PropertyID对应的信息已经解析完成信息（例如数据格式、音频数据的偏移量等等），使用者可以通过<code>AudioFileStreamGetProperty</code>接口获取PropertyID对应的值或者数据结构；</p>
-
-<p>```objc
-extern OSStatus AudioFileStreamGetProperty(AudioFileStreamID inAudioFileStream,</p>
-
-<pre><code>                                         AudioFileStreamPropertyID inPropertyID,
-                                         UInt32 * ioPropertyDataSize,
-                                         void * outPropertyData);
-</code></pre>
-
-<p>```</p>
-
-<p>第四个参数ioFlags是一个返回参数，表示这个property是否需要被缓存，如果需要赋值<code>kAudioFileStreamPropertyFlag_PropertyIsCached</code>否则不赋值（这个参数我也不知道应该在啥场景下使用。。一直都没去理他）；</p>
-
-<p>这个回调会进来多次，但并不是每一次都需要进行处理，可以根据需求处理需要的PropertyID进行处理（PropertyID列表如下）。
-```objc
-//AudioFileStreamProperty枚举
-enum
-{</p>
-
-<pre><code>kAudioFileStreamProperty_ReadyToProducePackets          =   'redy',
-kAudioFileStreamProperty_FileFormat                     =   'ffmt',
-kAudioFileStreamProperty_DataFormat                     =   'dfmt',
-kAudioFileStreamProperty_FormatList                     =   'flst',
-kAudioFileStreamProperty_MagicCookieData                    =   'mgic',
-kAudioFileStreamProperty_AudioDataByteCount             =   'bcnt',
-kAudioFileStreamProperty_AudioDataPacketCount           =   'pcnt',
-kAudioFileStreamProperty_MaximumPacketSize              =   'psze',
-kAudioFileStreamProperty_DataOffset                     =   'doff',
-kAudioFileStreamProperty_ChannelLayout                  =   'cmap',
-kAudioFileStreamProperty_PacketToFrame                  =   'pkfr',
-kAudioFileStreamProperty_FrameToPacket                  =   'frpk',
-kAudioFileStreamProperty_PacketToByte                   =   'pkby',
-kAudioFileStreamProperty_ByteToPacket                   =   'bypk',
-kAudioFileStreamProperty_PacketTableInfo                    =   'pnfo',
-kAudioFileStreamProperty_PacketSizeUpperBound           =   'pkub',
-kAudioFileStreamProperty_AverageBytesPerPacket          =   'abpp',
-kAudioFileStreamProperty_BitRate                            =   'brat',
-</code></pre>
-
-<p>  kAudioFileStreamProperty_InfoDictionary                  =    &lsquo;info&rsquo;
-};
-```</p>
-
-<p>这里列几个我认为比较重要的PropertyID：</p>
-
-<p>1、<code>kAudioFileStreamProperty_BitRate</code>：</p>
-
-<p>表示音频数据的码率，获取这个Property是为了计算音频的总时长Duration（因为AudioFileStream没有这样的接口。。）。</p>
-
-<p>```objc
-UInt32 bitRate;
-UInt32 bitRateSize = sizeof(bitRate);
-OSStatus status = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_BitRate, &amp;bitRateSize, &amp;bitRate);
-if (status != noErr)
-{</p>
-
-<pre><code>//错误处理
-</code></pre>
-
-<p>}
-```</p>
-
-<p><strong>2014.8.2 补充：</strong>
-发现在流播放的情况下，有时数据流量比较小时会出现<code>ReadyToProducePackets</code>还是没有获取到bitRate的情况，这时就需要分离一些拼音帧然后计算平均bitRate，计算公式如下：</p>
-
-<p><code>objc
-UInt32 averageBitRate = totalPackectByteCount / totalPacketCout;
-</code></p>
-
-<p>2、<code>kAudioFileStreamProperty_DataOffset</code>：</p>
-
-<p>表示音频数据在整个音频文件中的offset（因为大多数音频文件都会有一个文件头之后才使真正的音频数据），这个值在seek时会发挥比较大的作用，音频的seek并不是直接seek文件位置而seek时间（比如seek到2分10秒的位置），seek时会根据时间计算出音频数据的字节offset然后需要再加上音频数据的offset才能得到在文件中的真正offset。
-```objc
-SInt64 dataOffset;
-UInt32 offsetSize = sizeof(dataOffset);
-OSStatus status = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_DataOffset, &amp;offsetSize, &amp;dataOffset);
-if (status != noErr)
-{</p>
-
-<pre><code>//错误处理
-</code></pre>
-
-<p>}
-```</p>
-
-<p>3、<code>kAudioFileStreamProperty_DataFormat</code></p>
-
-<p>表示音频文件结构信息，是一个AudioStreamBasicDescription的结构</p>
-
-<p>```objc
-struct AudioStreamBasicDescription
-{</p>
-
-<pre><code>Float64 mSampleRate;
-UInt32  mFormatID;
-UInt32  mFormatFlags;
-UInt32  mBytesPerPacket;
-UInt32  mFramesPerPacket;
-UInt32  mBytesPerFrame;
-UInt32  mChannelsPerFrame;
-UInt32  mBitsPerChannel;
-UInt32  mReserved;
-</code></pre>
-
-<p>};</p>
-
-<p>AudioStreamBasicDescription asbd;
-UInt32 asbdSize = sizeof(asbd);
-OSStatus status = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_DataFormat, &amp;asbdSize, &amp;asbd);
-if (status != noErr)
-{</p>
-
-<pre><code>//错误处理
-</code></pre>
-
-<p>} <br/>
-```</p>
-
-<p>4、<code>kAudioFileStreamProperty_FormatList</code></p>
-
-<p>作用和<code>kAudioFileStreamProperty_DataFormat</code>是一样的，区别在于用这个PropertyID获取到是一个AudioStreamBasicDescription的数组，这个参数是用来支持AAC SBR这样的包含多个文件类型的音频格式。由于到底有多少个format我们并不知晓，所以需要先获取一下总数据大小：</p>
-
-<p>```objc
-//获取数据大小
-Boolean outWriteable;
-UInt32 formatListSize;
-OSStatus status = AudioFileStreamGetPropertyInfo(inAudioFileStream, kAudioFileStreamProperty_FormatList, &amp;formatListSize, &amp;outWriteable);
-if (status != noErr)
-{</p>
-
-<pre><code>//错误处理
-</code></pre>
-
-<p>}</p>
-
-<p>//获取formatlist
-AudioFormatListItem *formatList = malloc(formatListSize);
-OSStatus status = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_FormatList, &amp;formatListSize, formatList);
-if (status != noErr)
-{</p>
-
-<pre><code>//错误处理
-</code></pre>
-
-<p>}</p>
-
-<p>//选择需要的格式
-for (int i = 0; i * sizeof(AudioFormatListItem) &lt; formatListSize; i += sizeof(AudioFormatListItem))
-{</p>
-
-<pre><code>AudioStreamBasicDescription pasbd = formatList[i].mASBD;
-//选择需要的格式。。                             
-</code></pre>
-
-<p>}
-free(formatList);
-```</p>
-
-<p>5、<code>kAudioFileStreamProperty_AudioDataByteCount</code></p>
-
-<p>顾名思义，音频文件中音频数据的总量。这个Property的作用一是用来计算音频的总时长，二是可以在seek时用来计算时间对应的字节offset。</p>
-
-<p>```objc
-UInt64 audioDataByteCount;
-UInt32 byteCountSize = sizeof(audioDataByteCount);
-OSStatus status = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_AudioDataByteCount, &amp;byteCountSize, &amp;audioDataByteCount);
-if (status != noErr)
-{</p>
-
-<pre><code>//错误处理
-</code></pre>
-
-<p>}
-```</p>
-
-<p><strong>2014.8.2 补充：</strong>
-发现在流播放的情况下，有时数据流量比较小时会出现<code>ReadyToProducePackets</code>还是没有获取到audioDataByteCount的情况，这时就需要近似计算audioDataByteCount。一般来说音频文件的总大小一定是可以得到的（利用文件系统或者Http请求中的contentLength），那么计算方法如下：</p>
-
-<p><code>objc
-UInt32 dataOffset = ...; //kAudioFileStreamProperty_DataOffset
-UInt32 fileLength = ...; //音频文件大小
-UInt32 audioDataByteCount = fileLength - dataOffset;
-</code></p>
-
-<p>5、<code>kAudioFileStreamProperty_ReadyToProducePackets</code></p>
-
-<p>这个PropertyID可以不必获取对应的值，一旦回调中这个PropertyID出现就代表解析完成，接下来可以对音频数据进行帧分离了。</p>
-
-<hr />
-
-<h1>计算时长Duration</h1>
-
-<p>获取时长的最佳方法是从ID3信息中去读取，那样是最准确的。如果ID3信息中没有存，那就依赖于文件头中的信息去计算了。</p>
-
-<p>计算duration的公式如下：</p>
-
-<p><code>
-double duration = (audioDataByteCount * 8) / bitRate
-</code></p>
-
-<p>音频数据的字节总量audioDataByteCount可以通过<code>kAudioFileStreamProperty_AudioDataByteCount</code>获取，码率bitRate可以通过<code>kAudioFileStreamProperty_BitRate</code>获取也可以通过Parse一部分数据后计算平均码率来得到。</p>
-
-<p>对于CBR数据来说用这样的计算方法的duration会比较准确，对于VBR数据就不好说了。所以对于VBR数据来说，最好是能够从ID3信息中获取到duration，获取不到再想办法通过计算平均码率的途径来计算duration。</p>
-
-<hr />
-
-<h1>分离音频帧</h1>
-
-<p>读取格式信息完成之后继续调用<code>AudioFileStreamParseBytes</code>方法可以对帧进行分离，并同步的进入<code>AudioFileStream_PacketsProc</code>回调方法。</p>
-
-<p><img src="/images/iOS-audio/audiofilestreamParse-2.jpg" alt="" /></p>
-
-<p>回调的定义：</p>
-
-<p>```objc
-typedef void (*AudioFileStream_PacketsProc)(void * inClientData,</p>
-
-<pre><code>                                          UInt32 inNumberBytes,
-                                          UInt32 inNumberPackets,
-                                          const void * inInputData,
-                                          AudioStreamPacketDescription * inPacketDescriptions);
-</code></pre>
-
-<p>```
-第一个参数，一如既往的上下文对象；</p>
-
-<p>第二个参数，本次处理的数据大小；</p>
-
-<p>第三个参数，本次总共处理了多少帧（即代码里的Packet）；</p>
-
-<p>第四个参数，本次处理的所有数据；</p>
-
-<p>第五个参数，<code>AudioStreamPacketDescription</code>数组，存储了每一帧数据是从第几个字节开始的，这一帧总共多少字节。</p>
-
-<p>```objc
-//AudioStreamPacketDescription结构
-//这里的mVariableFramesInPacket是指实际的数据帧只有VBR的数据才能用到（像MP3这样的压缩数据一个帧里会有好几个数据帧）
-struct  AudioStreamPacketDescription
-{</p>
-
-<pre><code>SInt64  mStartOffset;
-UInt32  mVariableFramesInPacket;
-UInt32  mDataByteSize;
-</code></pre>
-
-<p>};
-```</p>
-
-<p>下面是我按照自己的理解实现的回调方法片段：</p>
-
-<p>```
-static void MyAudioFileStreamPacketsCallBack(void *inClientData,</p>
-
-<pre><code>                                         UInt32 inNumberBytes,
-                                         UInt32 inNumberPackets,
-                                         const void *inInputData,
-                                         AudioStreamPacketDescription   *inPacketDescriptions)
-</code></pre>
-
-<p>{</p>
-
-<pre><code>//处理discontinuous..
-
-if (numberOfBytes == 0 || numberOfPackets == 0)
-{
-    return;
-}
-
-BOOL deletePackDesc = NO;
-if (packetDescriptioins == NULL)
-{
-    //如果packetDescriptioins不存在，就按照CBR处理，平均每一帧的数据后生成packetDescriptioins
-    deletePackDesc = YES;
-    UInt32 packetSize = numberOfBytes / numberOfPackets;
-    packetDescriptioins = (AudioStreamPacketDescription *)malloc(sizeof(AudioStreamPacketDescription) * numberOfPackets);
-
-    for (int i = 0; i &lt; numberOfPackets; i++)
-    {
-        UInt32 packetOffset = packetSize * i;
-        descriptions[i].mStartOffset = packetOffset;
-        descriptions[i].mVariableFramesInPacket = 0;
-        if (i == numberOfPackets - 1)
-        {
-            packetDescriptioins[i].mDataByteSize = numberOfBytes - packetOffset;
-        }
-        else
-        {
-            packetDescriptioins[i].mDataByteSize = packetSize;
-        }
-    }
-}
-
-for (int i = 0; i &lt; numberOfPackets; ++i)
-{
-    SInt64 packetOffset = packetDescriptioins[i].mStartOffset;
-    UInt32 packetSize   = packetDescriptioins[i].mDataByteSize;
-
-    //把解析出来的帧数据放进自己的buffer中
-    ...
-}
-
-if (deletePackDesc)
-{
-    free(packetDescriptioins);
-}
-</code></pre>
-
-<p>}
-```
-inPacketDescriptions这个字段为空时需要按CBR的数据处理。但其实在解析CBR数据时inPacketDescriptions一般也会有返回，因为即使是CBR数据帧的大小也不是恒定不变的，例如CBR的MP3会在每一帧的数据后放1 byte的填充位，这个填充位也并非时时刻刻存在，所以帧的大小会有1 byte的浮动。（比如采样率44.1KHZ，码率160kbps的CBR MP3文件每一帧的大小在522字节和523字节浮动。所以不能因为有inPacketDescriptions没有返回NULL而判定音频数据就是VBR编码的）。</p>
-
-<hr />
-
-<h1>Seek</h1>
-
-<p>就音频的角度来seek功能描述为“我要拖到xx分xx秒”，而实际操作时我们需要操作的是文件，所以我们需要知道的是“我要拖到xx分xx秒”这个操作对应到文件上是要从第几个字节开始读取音频数据。</p>
-
-<p>对于原始的PCM数据来说每一个PCM帧都是固定长度的，对应的播放时长也是固定的，但一旦转换成压缩后的音频数据就会因为编码形式的不同而不同了。对于CBR而言每个帧中所包含的PCM数据帧是恒定的，所以每一帧对应的播放时长也是恒定的；而VBR则不同，为了保证数据最优并且文件大小最小，VBR的每一帧中所包含的PCM数据帧是不固定的，这就导致在流播放的情况下VBR的数据想要做seek并不容易。这里我们也只讨论CBR下的seek。</p>
-
-<p>CBR数据的seek一般是这样实现的（参考并修改自<a href="http://www.cocoawithlove.com/2010/03/streaming-mp3aac-audio-again.html">matt的blog</a>）：</p>
-
-<p>1、近似地计算应该seek到哪个字节</p>
-
-<p>```objc
-double seekToTime = &hellip;; //需要seek到哪个时间，秒为单位
-UInt64 audioDataByteCount = &hellip;; //通过kAudioFileStreamProperty_AudioDataByteCount获取的值
-SInt64 dataOffset = &hellip;; //通过kAudioFileStreamProperty_DataOffset获取的值
-double durtion = &hellip;; //通过公式(AudioDataByteCount * 8) / BitRate计算得到的时长</p>
-
-<p>//近似seekOffset = 数据偏移 + seekToTime对应的近似字节数
-SInt64 approximateSeekOffset = dataOffset + (seekToTime / duration) * audioDataByteCount;
-```</p>
-
-<p>2、计算seekToTime对应的是第几个帧（Packet）</p>
-
-<p>我们可以利用之前Parse得到的音频格式信息来计算PacketDuration。<em>audioItem.fileFormat.mFramesPerPacket / </em>audioItem.fileFormat.mSampleRate;</p>
-
-<p>```objc
-//首先需要计算每个packet对应的时长
-AudioStreamBasicDescription asbd = &hellip;; ////通过kAudioFileStreamProperty_DataFormat或者kAudioFileStreamProperty_FormatList获取的值
-double packetDuration = asbd.mFramesPerPacket / asbd.mSampleRate</p>
-
-<p>//然后计算packet位置
-SInt64 seekToPacket = floor(seekToTime / packetDuration);
-```</p>
-
-<p>3、使用<code>AudioFileStreamSeek</code>计算精确的字节偏移和时间</p>
-
-<p><code>AudioFileStreamSeek</code>可以用来寻找某一个帧（Packet）对应的字节偏移（byte offset）：</p>
-
-<ul>
-<li>如果找到了就会把ioFlags加上kAudioFileStreamSeekFlag_OffsetIsEstimated，并且给outDataByteOffset赋值，outDataByteOffset就是输入的seekToPacket对应的字节偏移量，我们可以根据outDataByteOffset来计算出精确的seekOffset和seekToTime；</li>
-<li>如果没找到那么还是应该用第1步计算出来的approximateSeekOffset来做seek；</li>
-</ul>
-
-
-<p>```
-SInt64 seekByteOffset;
-UInt32 ioFlags = 0;
-SInt64 outDataByteOffset;
-OSStatus status = AudioFileStreamSeek(audioFileStreamID, seekToPacket, &amp;outDataByteOffset, &amp;ioFlags);
-if (status == noErr &amp;&amp; !(ioFlags &amp; kAudioFileStreamSeekFlag_OffsetIsEstimated))
-{</p>
-
-<pre><code>//如果AudioFileStreamSeek方法找到了帧的字节偏移，需要修正一下时间
-seekToTime -= ((seekByteOffset - dataOffset) - outDataByteOffset) * 8.0 / bitRate;
-seekByteOffset = outDataByteOffset + dataOffset;
-</code></pre>
-
-<p>}
-else
-{</p>
-
-<pre><code>seekByteOffset = approximateSeekOffset;
-</code></pre>
-
-<p>}
-<code>``
-4、按照seekByteOffset读取对应的数据继续使用</code>AudioFileStreamParseByte`进行解析</p>
-
-<p>如果是网络流可以通过设置range头来获取字节，本地文件的话直接seek就好了。调用<code>AudioFileStreamParseByte</code>时注意刚seek完第一次Parse数据需要加参数<code>kAudioFileStreamParseFlag_Discontinuity</code>。</p>
-
-<hr />
-
-<h1>关闭AudioFileStream</h1>
-
-<p><code>AudioFileStream</code>使用完毕后需要调用<code>AudioFileStreamClose</code>进行关闭，没啥特别需要注意的。</p>
-
-<p><code>objc
-extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);  
-</code></p>
-
-<hr />
-
-<h1>小结</h1>
-
-<p>本篇关于<code>AudioFileStream</code>做了详细介绍，小结一下：</p>
-
-<ul>
-<li><p>使用<code>AudioFileStream</code>首先需要调用<code>AudioFileStreamOpen</code>，需要注意的是尽量提供inFileTypeHint参数帮助<code>AudioFileStream</code>解析数据，调用完成后记录<code>AudioFileStreamID</code>；</p></li>
-<li><p>当有数据时调用<code>AudioFileStreamParseBytes</code>进行解析，每一次解析都需要注意返回值，返回值一旦出现noErr以外的值就代表Parse出错，其中<code>kAudioFileStreamError_NotOptimized</code>代表该文件缺少头信息或者其头信息在文件尾部不适合流播放；</p></li>
-<li><p>使用<code>AudioFileStreamParseBytes</code>需要注意第四个参数在需要合适的时候传入<code>kAudioFileStreamParseFlag_Discontinuity</code>；</p></li>
-<li><p>调用<code>AudioFileStreamParseBytes</code>后会首先同步进入<code>AudioFileStream_PropertyListenerProc</code>回调来解析文件格式信息，如果回调得到<code>kAudioFileStreamProperty_ReadyToProducePackets</code>表示解析格式信息完成；</p></li>
-<li><p>解析格式信息完成后继续调用<code>AudioFileStreamParseBytes</code>会进入<code>MyAudioFileStreamPacketsCallBack</code>回调来分离音频帧，在回调中应该将分离出来的帧信息保存到自己的buffer中</p></li>
-<li><p>seek时需要先近似的计算seekTime对应的seekByteOffset，然后利用<code>AudioFileStreamSeek</code>计算精确的offset，如果能得到精确的offset就修正一下seektime，如果无法得到精确的offset就用之前的近似结果</p></li>
-<li><p><code>AudioFileStream</code>使用完毕后需要调用<code>AudioFileStreamClose</code>进行关闭；</p></li>
-</ul>
-
-
-<hr />
-
-<h1>示例代码</h1>
-
-<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>这两个优秀的开源播放器都用到<code>AudioFileStream</code>大家可以借鉴。我自己也写了一个<a href="https://github.com/msching/MCAudioFileStream">简单的AudioFileStream封装</a>。</p>
-
-<hr />
-
-<h1>下篇预告</h1>
-
-<p>下一篇将讲述如何使用<code>AudioFile</code>。</p>
-
-<hr />
-
-<h1>参考资料</h1>
-
-<p><a href="https://developer.apple.com/library/ios/documentation/audiovideo/conceptual/multimediapg/usingaudio/usingaudio.html#//apple_ref/doc/uid/TP40009767-CH2-SW28">Using Audio</a></p>
-
-<p><a href="http://www.cocoawithlove.com/2008/09/streaming-and-playing-live-mp3-stream.html">Streaming and playing an MP3 stream</a></p>
-
-<p><a href="http://www.cocoawithlove.com/2010/03/streaming-mp3aac-audio-again.html">Streaming MP3/AAC audio again</a></p>
 ]]></content>
   </entry>
   

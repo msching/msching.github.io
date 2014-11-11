@@ -7,7 +7,7 @@
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="Jul 8th, 2014 Audio, iOS iOS音频播放 (二)：AudioSession Audio Playback in iOS (Part 2) : AudioSession 前言 本篇为《iOS音频播放》系列的第二篇。 在实施前一篇中所述的7个步骤之前还必须面对一个麻烦的问题， &hellip;">
+	<meta name="description" content="Jul 8th, 2014 Audio, iOS, iOS Audio iOS音频播放 (二)：AudioSession Audio Playback in iOS (Part 2) : AudioSession 前言 本篇为《iOS音频播放》系列的第二篇。 &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -94,7 +94,7 @@
 		<div class="tags">
 
 
-	<a class='category' href='/blog/categories/audio/'>Audio</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>
+	<a class='category' href='/blog/categories/audio/'>Audio</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>, <a class='category' href='/blog/categories/ios-audio/'>iOS Audio</a>
 
 
 </div>
@@ -163,7 +163,7 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>前两个参数一般填<code>NULL</code>表示AudioSession运行在主线程上（但并不代表音频的相关处理运行在主线程上，只是AudioSession），第三个参数需要传入一个一个<code>AudioSessionInterruptionListener</code>类型的方法，作为AudioSession被打断时的回调，第四个参数则是代表打断回调时需要附带的对象（即回到方法中的inClientData，如下所示，可以理解为UIView animation中的context）。</p>
+<p>前两个参数一般填<code>NULL</code>表示AudioSession运行在主线程上（但并不代表音频的相关处理运行在主线程上，只是AudioSession），第三个参数需要传入一个<code>AudioSessionInterruptionListener</code>类型的方法，作为AudioSession被打断时的回调，第四个参数则是代表打断回调时需要附带的对象（即回到方法中的inClientData，如下所示，可以理解为UIView animation中的context）。</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">typedef</span> <span class="nf">void</span> <span class="p">(</span><span class="o">*</span><span class="n">AudioSessionInterruptionListener</span><span class="p">)(</span><span class="kt">void</span> <span class="o">*</span> <span class="n">inClientData</span><span class="p">,</span> <span class="n">UInt32</span> <span class="n">inInterruptionState</span><span class="p">);</span>
