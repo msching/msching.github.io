@@ -154,7 +154,7 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>使用也同样简单，首先<code>#import &lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>然后调用<code>MPNowPlayingInfoCenter</code>的单例方法获取实例，再把需要显示的信息组织成Dictionary并复制给<code>nowPlayingInfo</code>属性就完成了。</p>
+<p>使用也同样简单，首先<code>#import &lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>然后调用<code>MPNowPlayingInfoCenter</code>的单例方法获取实例，再把需要显示的信息组织成Dictionary并赋值给<code>nowPlayingInfo</code>属性就完成了。</p>
 
 <p><code>nowPlayingInfo</code>中一些常用属性被定义在<code>&lt;MediaPlayer/MPMediaItem.h&gt;</code>中</p>
 
@@ -299,7 +299,7 @@
 
 <p>这里需要解释的是，<code>NowPlayingCenter</code>中的进度刷新并不是由app不停的更新<code>nowPlayingInfo</code>来做的，而是根据app传入的<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>进行自动刷新。例如传入ElapsedPlaybackTime=120s，PlaybackRate=1.0，那么<code>NowPlayingCenter</code>会显示2:00并且在接下来的时间中每一秒把进度加1秒并刷新显示。如果需要暂停进度，传入PlaybackRate=0.0即可。</p>
 
-<p>所以每次播放暂停和继续都需要更新<code>NowPlayingCenter</code>并正确设置<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>否则，<code>NowPlayingCenter</code>中的播放进度无法正常显示。</p>
+<p>所以每次播放暂停和继续都需要更新<code>NowPlayingCenter</code>并正确设置<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>否则<code>NowPlayingCenter</code>中的播放进度无法正常显示。</p>
 
 <h3>NowPlayingCenter的刷新时机</h3>
 
@@ -315,7 +315,7 @@
 </ul>
 
 
-<p>在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数</p>
+<p>在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数。</p>
 
 <h3>MPMediaItemPropertyArtwork</h3>
 
@@ -373,7 +373,9 @@
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span> <span class="n">argv</span><span class="p">[])</span> <span class="p">{</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span> <span class="n">argv</span><span class="p">[])</span>
+</span><span class='line'><span class="p">{</span>
 </span><span class='line'>    <span class="err">@</span><span class="n">autoreleasepool</span> <span class="p">{</span>
 </span><span class='line'>        <span class="k">return</span> <span class="n">UIApplicationMain</span><span class="p">(</span><span class="n">argc</span><span class="p">,</span> <span class="n">argv</span><span class="p">,</span> <span class="n">nil</span><span class="p">,</span> <span class="n">NSStringFromClass</span><span class="p">([</span><span class="n">AppDelegate</span> <span class="n">class</span><span class="p">]));</span>
 </span><span class='line'>    <span class="p">}</span>

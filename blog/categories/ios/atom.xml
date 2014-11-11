@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2014-11-11T16:18:14+08:00</updated>
+  <updated>2014-11-11T16:30:05+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -55,7 +55,7 @@ MP_EXTERN_CLASS_AVAILABLE(5_0) @interface MPNowPlayingInfoCenter : NSObject</p>
 <p>@end
 ```</p>
 
-<p>使用也同样简单，首先<code>#import &lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>然后调用<code>MPNowPlayingInfoCenter</code>的单例方法获取实例，再把需要显示的信息组织成Dictionary并复制给<code>nowPlayingInfo</code>属性就完成了。</p>
+<p>使用也同样简单，首先<code>#import &lt;MediaPlayer/MPNowPlayingInfoCenter.h&gt;</code>然后调用<code>MPNowPlayingInfoCenter</code>的单例方法获取实例，再把需要显示的信息组织成Dictionary并赋值给<code>nowPlayingInfo</code>属性就完成了。</p>
 
 <p><code>nowPlayingInfo</code>中一些常用属性被定义在<code>&lt;MediaPlayer/MPMediaItem.h&gt;</code>中</p>
 
@@ -140,7 +140,7 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 
 <p>这里需要解释的是，<code>NowPlayingCenter</code>中的进度刷新并不是由app不停的更新<code>nowPlayingInfo</code>来做的，而是根据app传入的<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>进行自动刷新。例如传入ElapsedPlaybackTime=120s，PlaybackRate=1.0，那么<code>NowPlayingCenter</code>会显示2:00并且在接下来的时间中每一秒把进度加1秒并刷新显示。如果需要暂停进度，传入PlaybackRate=0.0即可。</p>
 
-<p>所以每次播放暂停和继续都需要更新<code>NowPlayingCenter</code>并正确设置<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>否则，<code>NowPlayingCenter</code>中的播放进度无法正常显示。</p>
+<p>所以每次播放暂停和继续都需要更新<code>NowPlayingCenter</code>并正确设置<code>ElapsedPlaybackTime</code>和<code>PlaybackRate</code>否则<code>NowPlayingCenter</code>中的播放进度无法正常显示。</p>
 
 <h3>NowPlayingCenter的刷新时机</h3>
 
@@ -156,7 +156,7 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 </ul>
 
 
-<p>在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数</p>
+<p>在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数。</p>
 
 <h3>MPMediaItemPropertyArtwork</h3>
 
@@ -206,7 +206,8 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 <p>然后找到工程中的<code>main.m</code>，可以看到代码如下：</p>
 
 <p>```c
-int main(int argc, char * argv[]) {</p>
+int main(int argc, char * argv[])
+{</p>
 
 <pre><code>@autoreleasepool {
     return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
