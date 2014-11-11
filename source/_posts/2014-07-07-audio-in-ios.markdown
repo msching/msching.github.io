@@ -5,7 +5,7 @@ subtitle: "Audio playback in iOS (Part 1) : Introduction"
 date: 2014-07-07 14:40:42 +0800
 comments: true
 statement: true
-categories: [iOS,Audio]
+categories: [iOS,Audio,iOS Audio]
 ---
 
 #前言

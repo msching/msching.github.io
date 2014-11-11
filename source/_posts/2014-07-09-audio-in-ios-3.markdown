@@ -5,7 +5,7 @@ subtitle: "Audio playback in iOS (Part 3) : AudioFileStream"
 date: 2014-07-09 11:31:28 +0800
 comments: true
 statement: true
-categories: [iOS,Audio]
+categories: [iOS,Audio,iOS Audio]
 ---
 
 #前言

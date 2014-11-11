@@ -5,7 +5,7 @@ subtitle: "Audio playback in iOS (Part 4) : AudioFile"
 date: 2014-07-19 13:38:30 +0800
 comments: true
 statement: true
-categories: [iOS,Audio]
+categories: [iOS,Audio,iOS Audio]
 ---
 
 #前言

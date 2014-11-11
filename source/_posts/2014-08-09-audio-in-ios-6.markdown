@@ -5,7 +5,7 @@ subtitle: "Audio playback in iOS (Part 6) : Create a simple audio player"
 date: 2014-08-09 15:55:22 +0800
 comments: true
 statement: true
-categories: [iOS,Audio]
+categories: [iOS,Audio,iOS Audio]
 ---
 
 #前言

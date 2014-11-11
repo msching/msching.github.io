@@ -5,7 +5,7 @@ subtitle: "Audio playback in iOS (Part 2) : AudioSession"
 date: 2014-07-08 13:58:27 +0800
 comments: true
 statement: true
-categories: [iOS,Audio]
+categories: [iOS,Audio,iOS Audio]
 ---
 
 
@@ -56,7 +56,7 @@ extern OSStatus AudioSessionInitialize(CFRunLoopRef inRunLoop,
  										 void *inClientData);
 ```
 
-前两个参数一般填`NULL`表示AudioSession运行在主线程上（但并不代表音频的相关处理运行在主线程上，只是AudioSession），第三个参数需要传入一个一个`AudioSessionInterruptionListener`类型的方法，作为AudioSession被打断时的回调，第四个参数则是代表打断回调时需要附带的对象（即回到方法中的inClientData，如下所示，可以理解为UIView animation中的context）。
+前两个参数一般填`NULL`表示AudioSession运行在主线程上（但并不代表音频的相关处理运行在主线程上，只是AudioSession），第三个参数需要传入一个`AudioSessionInterruptionListener`类型的方法，作为AudioSession被打断时的回调，第四个参数则是代表打断回调时需要附带的对象（即回到方法中的inClientData，如下所示，可以理解为UIView animation中的context）。
 
 ```objc
 typedef void (*AudioSessionInterruptionListener)(void * inClientData, UInt32 inInterruptionState);

@@ -5,7 +5,7 @@ subtitle: "Audio playback in iOS (Part 5) : AudioQueue"
 date: 2014-08-02 14:21:13 +0800
 comments: true
 statement: true
-categories: [iOS,Audio]
+categories: [iOS,Audio,iOS Audio]
 ---
 
 #前言

@@ -5,7 +5,7 @@ subtitle: "Audio playback in iOS (Part 7) : Access iPod Library"
 date: 2014-09-07 15:45:47 +0800
 comments: true
 statement: true
-categories: [iOS,Audio]
+categories: [iOS,Audio,iOS Audio]
 ---
 
 #前言
