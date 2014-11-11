@@ -42,7 +42,7 @@ MP_EXTERN_CLASS_AVAILABLE(5_0) @interface MPNowPlayingInfoCenter : NSObject
 @end
 ```
 
-使用也同样简单，首先`#import <MediaPlayer/MPNowPlayingInfoCenter.h>`然后调用`MPNowPlayingInfoCenter`的单例方法获取实例，再把需要显示的信息组织成Dictionary并复制给`nowPlayingInfo`属性就完成了。
+使用也同样简单，首先`#import <MediaPlayer/MPNowPlayingInfoCenter.h>`然后调用`MPNowPlayingInfoCenter`的单例方法获取实例，再把需要显示的信息组织成Dictionary并赋值给`nowPlayingInfo`属性就完成了。
 
 `nowPlayingInfo`中一些常用属性被定义在`<MediaPlayer/MPMediaItem.h>`中
 
@@ -124,7 +124,7 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 
 这里需要解释的是，`NowPlayingCenter`中的进度刷新并不是由app不停的更新`nowPlayingInfo`来做的，而是根据app传入的`ElapsedPlaybackTime`和`PlaybackRate`进行自动刷新。例如传入ElapsedPlaybackTime=120s，PlaybackRate=1.0，那么`NowPlayingCenter`会显示2:00并且在接下来的时间中每一秒把进度加1秒并刷新显示。如果需要暂停进度，传入PlaybackRate=0.0即可。
 
-所以每次播放暂停和继续都需要更新`NowPlayingCenter`并正确设置`ElapsedPlaybackTime`和`PlaybackRate`否则，`NowPlayingCenter`中的播放进度无法正常显示。
+所以每次播放暂停和继续都需要更新`NowPlayingCenter`并正确设置`ElapsedPlaybackTime`和`PlaybackRate`否则`NowPlayingCenter`中的播放进度无法正常显示。
 
 ###NowPlayingCenter的刷新时机
 
@@ -137,7 +137,7 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 * 播放暂停或者恢复时
 * 当前播放歌曲的信息发生变化时（例如Artwork，duration等）
 
-在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数
+在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数。
 
 ###MPMediaItemPropertyArtwork
 
@@ -182,7 +182,8 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 然后找到工程中的`main.m`，可以看到代码如下：
 
 ```c
-int main(int argc, char * argv[]) {
+int main(int argc, char * argv[]) 
+{
     @autoreleasepool {
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
     }
