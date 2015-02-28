@@ -8,8 +8,6 @@ statement: true
 categories: [iOS,ASIHTTPRequest]
 ---
 
-----------
-
 ###这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。
 
 ###现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。

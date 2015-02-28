@@ -271,6 +271,7 @@ multitask :push do
     puts "\n## Github Pages deploy complete"
     system "git remote add gitcafe git@gitcafe.com:msching/msching.git >> /dev/null 2>&1"
     system "git push -u gitcafe master:gitcafe-pages"
+    puts "\n## Gitcafe Pages deploy complete"
   end
 end
 
