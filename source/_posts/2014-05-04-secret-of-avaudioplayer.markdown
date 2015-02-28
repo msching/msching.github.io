@@ -27,6 +27,8 @@ AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithData:data error:&error];
 Error Domain=NSOSStatusErrorDomain Code=1937337955 "The operation couldn’t be completed. (OSStatus error 1937337955.)"
 ```
 
+<!--more-->
+
 ----------
 
 #普遍的解决方法

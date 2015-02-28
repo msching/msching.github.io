@@ -8,11 +8,11 @@ statement: true
 categories: [iOS,Audio,iOS Audio]
 ---
 
-#前言
-
 由于最近工作量非常饱和，所以这第七篇来的有点晚（创建时间是9月7日。。说出来都是泪）。
 
 现在市面上的音乐播放器都支持iPod Library歌曲（俗称iPod音乐或者本地音乐）的播放，用户对于iPod音乐播放的需求也一直十分强烈。这篇要讲的是如何来播放iPod Library的歌曲。
+
+<!--more-->
 
 ----
 

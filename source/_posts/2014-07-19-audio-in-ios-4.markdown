@@ -8,9 +8,9 @@ statement: true
 categories: [iOS,Audio,iOS Audio]
 ---
 
-#前言
-
 接着[第三篇](/blog/2014/07/09/audio-in-ios-3/)的`AudioStreamFile`这一篇要来聊一下`AudioFile`。和`AudioStreamFile`一样`AudioFile`是`AudioToolBox` framework中的一员，它也能够完成[第一篇](/blog/2014/07/07/audio-in-ios/)所述的第2步，读取音频格式信息和进行帧分离，但事实上它的功能远不止如此。
+
+<!--more-->
 
 -----
 

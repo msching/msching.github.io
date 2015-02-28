@@ -8,11 +8,11 @@ statement: true
 categories: [iOS,Audio,iOS Audio]
 ---
 
-#前言
-
 距离[上一篇](/blog/2014/09/07/audio-in-ios-7/)博文发布已经有一个月多的时间了，在这其间我一直忙于筹办婚礼以至于这篇博文一直拖到了现在。
 
 在之前[一到六篇](/blog/categories/ios-audio/)中我对iOS下的音频播放流程进行了阐述，在[第七篇](/blog/2014/09/07/audio-in-ios-7/)中介绍了如何播放iPod Lib中的歌曲，至此有关音频播放的话题就已经完结了，在这篇里我将会讲到的`NowPlayingCenter`和`RemoteControl`这两个玩意本身和整个播放流程并没有什么关系，但它们可以让音频播放在iOS系统上获得更加好的用户体验。
+
+<!--more-->
 
 ----
 

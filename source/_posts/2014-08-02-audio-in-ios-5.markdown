@@ -8,9 +8,9 @@ statement: true
 categories: [iOS,Audio,iOS Audio]
 ---
 
-#前言
-
 在[第三篇](/blog/2014/07/09/audio-in-ios-3/)和[第四篇](/blog/2014/07/19/audio-in-ios-4/)中介绍了如何用`AudioStreamFile`和`AudioFile`解析音频数据格式、分离音频帧。下一步终于可以使用分离出来的音频帧进行播放了，本片中将来讲一讲如何使用`AudioQueue`播放音频数据。
+
+<!--more-->
 
 ----
 

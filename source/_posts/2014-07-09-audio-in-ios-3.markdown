@@ -8,11 +8,11 @@ statement: true
 categories: [iOS,Audio,iOS Audio]
 ---
 
-#前言
-
 本来说好是要在第三篇中讲`AudioFileStream`和`AudioQueue`，但写着写着发现光`AudioFileStream`就好多内容，最后还是决定分篇介绍，这篇先来说一下`AudioFileStream`，下一篇计划说一下和`AudioFileStream`类似的`AudioFile`，下下篇再来说`AudioQueue`。
 
 在本篇那种将会提到计算音频时长duration和音频seek的方法，这些方法对于CBR编码形式的音频文件可以做到比较精确而对于VBR编码形式的会存在较大的误差（关于CBR和VBR，请看本系列的[第一篇](/blog/2014/07/07/audio-in-ios/)），具体讲到duration和seek时会再进行说明。
+
+<!--more-->
 
 ----
 

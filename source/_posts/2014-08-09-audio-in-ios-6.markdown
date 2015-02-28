@@ -8,8 +8,6 @@ statement: true
 categories: [iOS,Audio,iOS Audio]
 ---
 
-#前言
-
 在前几篇中我分别讲到了`AudioSession`、`AudioFileStream`、`AudioFile`、`AudioQueue`，这些类的功能已经涵盖了[第一篇](/blog/2014/07/07/audio-in-ios/)中所提到的音频播放所需要的步骤：
 
 1. 读取MP3文件	 `NSFileHandle`
@@ -23,6 +21,8 @@ categories: [iOS,Audio,iOS Audio]
 下面我们就讲讲述如何用这些部件组成一个简单的`本地音乐播放器`，这里我会用到**AudioSession**、**AudioFileStream**、**AudioFile**、**AudioQueue**。
 
 **注意：在阅读本篇请实现阅读并理解前面1-5篇的内容以及2-5篇最后给出的封装类，本篇中的播放器实现将基于前面几篇中给出的[MCAudioSession](https://github.com/msching/MCAudioSession)、[MCAudioFileStream](https://github.com/msching/MCAudioFileStream)、[MCAudioFile](https://github.com/msching/MCAudioFile)和[MCAudioOutputQueue](https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h)进行实现。**
+
+<!--more-->
 
 ----
 
