@@ -7,7 +7,7 @@
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="Aug 9th, 2014 Audio, iOS, iOS Audio iOS音频播放 (六)：简单的音频播放器实现 Audio Playback in iOS (Part 6) : Create a Simple Audio Player 前言 在前几篇中我分别讲到了AudioSession、 &hellip;">
+	<meta name="description" content="Aug 9th, 2014 Audio, iOS, iOS Audio iOS音频播放 (六)：简单的音频播放器实现 Audio Playback in iOS (Part 6) : Create a Simple Audio Player 在前几篇中我分别讲到了AudioSession、 &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -103,9 +103,7 @@
 	<h1 class="title" itemprop="name">iOS音频播放 (六)：简单的音频播放器实现</h1>
 	<p class="subtitle" itemprop="name">Audio Playback in iOS (Part 6) : Create a Simple Audio Player</p>
 	<hr />
-	<div class="entry-content" itemprop="articleBody"><h1>前言</h1>
-
-<p>在前几篇中我分别讲到了<code>AudioSession</code>、<code>AudioFileStream</code>、<code>AudioFile</code>、<code>AudioQueue</code>，这些类的功能已经涵盖了<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>中所提到的音频播放所需要的步骤：</p>
+	<div class="entry-content" itemprop="articleBody"><p>在前几篇中我分别讲到了<code>AudioSession</code>、<code>AudioFileStream</code>、<code>AudioFile</code>、<code>AudioQueue</code>，这些类的功能已经涵盖了<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>中所提到的音频播放所需要的步骤：</p>
 
 <ol>
 <li>读取MP3文件   <code>NSFileHandle</code></li>
@@ -121,6 +119,9 @@
 <p>下面我们就讲讲述如何用这些部件组成一个简单的<code>本地音乐播放器</code>，这里我会用到<strong>AudioSession</strong>、<strong>AudioFileStream</strong>、<strong>AudioFile</strong>、<strong>AudioQueue</strong>。</p>
 
 <p><strong>注意：在阅读本篇请实现阅读并理解前面1-5篇的内容以及2-5篇最后给出的封装类，本篇中的播放器实现将基于前面几篇中给出的<a href="https://github.com/msching/MCAudioSession">MCAudioSession</a>、<a href="https://github.com/msching/MCAudioFileStream">MCAudioFileStream</a>、<a href="https://github.com/msching/MCAudioFile">MCAudioFile</a>和<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>进行实现。</strong></p>
+
+<!--more-->
+
 
 <hr />
 

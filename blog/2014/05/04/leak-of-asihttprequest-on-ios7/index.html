@@ -109,8 +109,6 @@
 
 <h3>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</h3>
 
-<hr />
-
 <h1>发现问题</h1>
 
 <p>iOS7发布后，我们对产品进行了iOS7的适配。适配完成之后的某天，我使用Leaks对产品的新版本进行内存泄漏检测时发现ASIHTTPRequest存在内存泄漏问题，当时使用的设备是iTouch5，系统为iOS7.0.2。</p>
@@ -132,6 +130,9 @@
 <p>对于这样的结果我仍然不是很确信，因为项目的需要我们对ASIHTTPRequest进行了一定的定制，修改了其中一部分代码。为了确定问题确实是出在ASIHTTPRequest上，我去github上翻出了ASIHTTPRequest的repo，pull了最新的代码，用Leaks在iOS7系统上进行了profile。在profile过程中我对iPhone Sample中的每个Tab以此进行了测试，结果在<strong>Synchronous</strong>和<strong>Queue</strong>上并没有发现内存泄漏，在<strong>Upload</strong>上发现了和之前一样泄漏。随后在iOS5和iOS6上也进行了一样的测试，结果依然是没有任何泄漏。</p>
 
 <p>自此确定了这是ASIHTTPRequest在iOS7下特有的内存泄漏，并且只会出现在有POST body的情况下。</p>
+
+<!--more-->
+
 
 <hr />
 
