@@ -4,7 +4,7 @@
   <title><![CDATA[码农人生]]></title>
   <link href="http://msching.github.io/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2015-02-28T17:57:23+08:00</updated>
+  <updated>2015-02-28T18:11:15+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -4854,9 +4854,7 @@ Thanks for the Tip! –  mtmurdock Mar 19 '11 at 0:26
     <link href="http://msching.github.io/blog/2014/05/04/leak-of-asihttprequest-on-ios7/"/>
     <updated>2014-05-04T14:43:40+08:00</updated>
     <id>http://msching.github.io/blog/2014/05/04/leak-of-asihttprequest-on-ios7</id>
-    <content type="html"><![CDATA[<hr />
-
-<h3>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</h3>
+    <content type="html"><![CDATA[<h3>这是2013年下半年解决iOS7下ASIHTTPRequest内存泄露时所做的记录，现在搬运过来了。</h3>
 
 <h3>现在这个修复方法已经被merge到ASIHTTPRequest的主分支上，经过测试可以通过apple的审核，大家可以直接从主分支fork并使用了。</h3>
 
