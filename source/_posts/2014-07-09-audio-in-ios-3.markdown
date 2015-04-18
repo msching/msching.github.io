@@ -475,8 +475,8 @@ SInt64 seekToPacket = floor(seekToTime / packetDuration);
 
 `AudioFileStreamSeek`可以用来寻找某一个帧（Packet）对应的字节偏移（byte offset）：
 
-* 如果找到了就会把ioFlags加上kAudioFileStreamSeekFlag_OffsetIsEstimated，并且给outDataByteOffset赋值，outDataByteOffset就是输入的seekToPacket对应的字节偏移量，我们可以根据outDataByteOffset来计算出精确的seekOffset和seekToTime；
-* 如果没找到那么还是应该用第1步计算出来的approximateSeekOffset来做seek；
+* 如果ioFlags里有kAudioFileStreamSeekFlag_OffsetIsEstimated说明给出的outDataByteOffset是估算的，并不准确，那么还是应该用第1步计算出来的approximateSeekOffset来做seek；
+* 如果ioFlags里没有kAudioFileStreamSeekFlag_OffsetIsEstimated说明给出了准确的outDataByteOffset，就是输入的seekToPacket对应的字节偏移量，我们可以根据outDataByteOffset来计算出精确的seekOffset和seekToTime；
 
 ```
 SInt64 seekByteOffset;
@@ -485,8 +485,8 @@ SInt64 outDataByteOffset;
 OSStatus status = AudioFileStreamSeek(audioFileStreamID, seekToPacket, &outDataByteOffset, &ioFlags);
 if (status == noErr && !(ioFlags & kAudioFileStreamSeekFlag_OffsetIsEstimated))
 {
-	//如果AudioFileStreamSeek方法找到了帧的字节偏移，需要修正一下时间
-	seekToTime -= ((seekByteOffset - dataOffset) - outDataByteOffset) * 8.0 / bitRate;
+	//如果AudioFileStreamSeek方法找到了准确的帧字节偏移，需要修正一下时间
+	seekToTime -= ((approximateSeekOffset - dataOffset) - outDataByteOffset) * 8.0 / bitRate;
 	seekByteOffset = outDataByteOffset + dataOffset;
 }
 else
