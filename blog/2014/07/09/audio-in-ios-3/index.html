@@ -799,8 +799,8 @@
 <p><code>AudioFileStreamSeek</code>可以用来寻找某一个帧（Packet）对应的字节偏移（byte offset）：</p>
 
 <ul>
-<li>如果找到了就会把ioFlags加上kAudioFileStreamSeekFlag_OffsetIsEstimated，并且给outDataByteOffset赋值，outDataByteOffset就是输入的seekToPacket对应的字节偏移量，我们可以根据outDataByteOffset来计算出精确的seekOffset和seekToTime；</li>
-<li>如果没找到那么还是应该用第1步计算出来的approximateSeekOffset来做seek；</li>
+<li>如果ioFlags里有kAudioFileStreamSeekFlag_OffsetIsEstimated说明给出的outDataByteOffset是估算的，并不准确，那么还是应该用第1步计算出来的approximateSeekOffset来做seek；</li>
+<li>如果ioFlags里没有kAudioFileStreamSeekFlag_OffsetIsEstimated说明给出了准确的outDataByteOffset，就是输入的seekToPacket对应的字节偏移量，我们可以根据outDataByteOffset来计算出精确的seekOffset和seekToTime；</li>
 </ul>
 
 
@@ -824,8 +824,8 @@
 </span><span class='line'><span class="n">OSStatus</span> <span class="n">status</span> <span class="o">=</span> <span class="n">AudioFileStreamSeek</span><span class="p">(</span><span class="n">audioFileStreamID</span><span class="p">,</span> <span class="n">seekToPacket</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">outDataByteOffset</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">ioFlags</span><span class="p">);</span>
 </span><span class='line'><span class="k">if</span> <span class="p">(</span><span class="n">status</span> <span class="o">==</span> <span class="n">noErr</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="p">(</span><span class="n">ioFlags</span> <span class="o">&amp;</span> <span class="n">kAudioFileStreamSeekFlag_OffsetIsEstimated</span><span class="p">))</span>
 </span><span class='line'><span class="p">{</span>
-</span><span class='line'>  <span class="c1">//如果AudioFileStreamSeek方法找到了帧的字节偏移，需要修正一下时间</span>
-</span><span class='line'>  <span class="n">seekToTime</span> <span class="o">-=</span> <span class="p">((</span><span class="n">seekByteOffset</span> <span class="o">-</span> <span class="n">dataOffset</span><span class="p">)</span> <span class="o">-</span> <span class="n">outDataByteOffset</span><span class="p">)</span> <span class="o">*</span> <span class="mf">8.0</span> <span class="o">/</span> <span class="n">bitRate</span><span class="p">;</span>
+</span><span class='line'>  <span class="c1">//如果AudioFileStreamSeek方法找到了准确的帧字节偏移，需要修正一下时间</span>
+</span><span class='line'>  <span class="n">seekToTime</span> <span class="o">-=</span> <span class="p">((</span><span class="n">approximateSeekOffset</span> <span class="o">-</span> <span class="n">dataOffset</span><span class="p">)</span> <span class="o">-</span> <span class="n">outDataByteOffset</span><span class="p">)</span> <span class="o">*</span> <span class="mf">8.0</span> <span class="o">/</span> <span class="n">bitRate</span><span class="p">;</span>
 </span><span class='line'>  <span class="n">seekByteOffset</span> <span class="o">=</span> <span class="n">outDataByteOffset</span> <span class="o">+</span> <span class="n">dataOffset</span><span class="p">;</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'><span class="k">else</span>
