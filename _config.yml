@@ -103,5 +103,5 @@ google_analytics_tracking_id:
 # Facebook Like
 facebook_like: false
 
-# UYan
-uyan_id: 1925419
+# duoshuo comments
+duoshuo_short_name: msching
