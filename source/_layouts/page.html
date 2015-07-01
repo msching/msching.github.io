@@ -11,9 +11,9 @@ layout: default
 {% unless page.sharing == false %}
 	{% include post/jiathis_sharing.html %}
 {% endunless %}
-{% if site.uyan_id and page.comments == true %}
+{% if site.duoshuo_short_name and page.comments == true %}
 <section id="comment">
     <h1 class="title">Comments</h1>
-    {% include post/uyan_comments.html %}
+    {% include post/duoshuo_comments.html %}
 </section>
 {% endif %}
