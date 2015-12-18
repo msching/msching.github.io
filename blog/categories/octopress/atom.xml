@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Octopress | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/octopress/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2015-07-15T16:42:55+08:00</updated>
+  <updated>2015-12-18T17:45:30+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -33,9 +33,11 @@
 
 <p>由于Octopress的使用需要Ruby，于是搭环境就这条路上的第一只拦路虎。Ruby版本繁多并且版本之间向下兼容做的不好，所以基于Ruby所做的框架大多要求特定版本的Ruby才能正常运行。</p>
 
-<p>Octopress要求的是Ruby1.9.3，MacOSX自带的Ruby版本是2.x的，所以需要利用一些工具来安装低版本的Ruby。Octopress的官方指南推荐使用的是RVM和rbenv。在安装的过程中我受限使用了RVM，但碰到了一些莫名的问题无法解决，最后还是使用了rbenv。</p>
+<p>Octopress要求的是Ruby1.9.3，MacOSX自带的Ruby版本是2.x的，所以需要利用一些工具来安装低版本的Ruby。Octopress的官方指南推荐使用的是RVM和rbenv，可以根据需要选择使用需要的工具。</p>
 
 <h3>安装rbenv</h3>
+
+<p>在第一次安装octopress（OSX 10.10时代）的过程中我首先使用了RVM，但碰到了一些莫名的问题无法解决，最后还是使用了rbenv。</p>
 
 <p>这里我使用<a href="http://brew.sh/">Homebrew</a>来安装rbenv，如果你没有Homebrew，打开终端，使用以下命令安装吧。</p>
 
@@ -51,9 +53,11 @@ $ brew install rbenv
 $ brew install ruby-build
 </code></p>
 
-<h3>安装Ruby</h3>
+<h3>用rbenv安装Ruby</h3>
 
-<p>使用rbenv安装1.9.3版本的ruby，一开始我安装的是1.9.3-p0的版本，但出现了一些错误，在搜素如何结果过程中发现<a href="http://www.cnblogs.com/peterpan507/p/3538057.html">@Peter潘</a>在blog中写到可以尝试用1.9.3-p125，经过尝试成功的安装上了Ruby1.9.3-p125</p>
+<p>使用rbenv安装1.9.3版本的ruby，一开始我安装的是1.9.3-p0的版本，但出现了一些错误，在搜素如何解决的过程中发现<a href="http://www.cnblogs.com/peterpan507/p/3538057.html">@Peter潘</a>在blog中写到可以尝试用1.9.3-p125，经过尝试成功的安装上了Ruby1.9.3-p125</p>
+
+<p>安装完成后可以用ruby &mdash;version进行验证</p>
 
 <p><code>
 $ rbenv install 1.9.3-p125
@@ -62,7 +66,26 @@ $ rbenv rehash
 $ ruby --version #ruby 1.9.3p125 (2012-02-16 revision 34643)
 </code></p>
 
-<p>安装完成后可以用ruby &mdash;version进行验证</p>
+<h3>安装RVM</h3>
+
+<p>在第二次安装octopress（OSX 10.11时代）的过程中依照之前的经验使用rbenv，但却怎么也安不上需要的ruby版本，最后换回了RVM。。</p>
+
+<p>安装octopress官方提供的安装方法</p>
+
+<p><code>
+$ curl -L https://get.rvm.io | bash -s stable --ruby
+</code></p>
+
+<h3>用RVM安装Ruby</h3>
+
+<p>使用rvm安装1.9.3版本的ruby，我依照之前的经验安装1.9.3-p125的版本，但在编译时出现了一些错误，继而尝试了评论中<a href="">@lance_lan</a>提到得1.9.3-p551版本才安装成功。</p>
+
+<p><code>
+$ rvm install ruby-1.9.3-p551 --with-gcc=clang
+$ rvm use 1.9.3-p551
+$ rvm rubygems latest
+$ ruby --version #ruby 1.9.3p551 (2014-11-13 revision 48407)
+</code></p>
 
 <h3>安装Octopress</h3>
 
@@ -78,7 +101,7 @@ $ cd octopress</p>
 <h1>安装依赖</h1>
 
 <p>$ gem install bundler
-$ rbenv rehash
+$ rbenv rehash  # 如果你刚才用了rbenv
 $ bundle install</p>
 
 <h1>安装octopress默认主题</h1>
