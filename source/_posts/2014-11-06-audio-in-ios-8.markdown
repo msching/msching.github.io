@@ -278,6 +278,9 @@ int main(int argc, char * argv[])
 
 git上有一个关于remotecontrol的小工程供大家参考[ios-audio-remote-control](https://github.com/MosheBerman/ios-audio-remote-control)
 
+<div class="github-card" data-github="MosheBerman/ios-audio-remote-control" data-width="400" data-height="" data-theme="default"></div>
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
 ----
 
 #后记

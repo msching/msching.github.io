@@ -532,7 +532,19 @@ extern OSStatus AudioFileStreamClose(AudioFileStreamID inAudioFileStream);
 
 #示例代码
 
-[AudioStreamer](https://github.com/mattgallagher/AudioStreamer)和[FreeStreamer](https://github.com/muhku/FreeStreamer)这两个优秀的开源播放器都用到`AudioFileStream`大家可以借鉴。我自己也写了一个[简单的AudioFileStream封装](https://github.com/msching/MCAudioFileStream)。
+[AudioStreamer](https://github.com/mattgallagher/AudioStreamer)和[FreeStreamer](https://github.com/muhku/FreeStreamer)这两个优秀的开源播放器都用到`AudioFileStream`大家可以借鉴。
+
+<div class="github-card" data-github="mattgallagher/AudioStreamer" data-width="400" data-height="" data-theme="default"></div>
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
+<div class="github-card" data-github="muhku/FreeStreamer" data-width="400" data-height="" data-theme="default"></div>
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
+
+我自己也写了一个[简单的AudioFileStream封装](https://github.com/msching/MCAudioFileStream)。
+
+<div class="github-card" data-github="msching/MCAudioFileStream" data-width="400" data-height="" data-theme="default"></div>
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
 
 ----
 

@@ -427,6 +427,9 @@ static void MyAudioSessionInterruptionListener(void *inClientData, UInt32 inInte
 
 [这里](https://github.com/msching/MCAudioSession)有我自己写的`AudioSession`的封装，如果各位需要支持iOS 5的话可以使用一下。
 
+<div class="github-card" data-github="msching/MCAudioSession" data-width="400" data-height="" data-theme="default"></div>
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
 ----
 
 #下篇预告

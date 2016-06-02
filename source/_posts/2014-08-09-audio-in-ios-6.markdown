@@ -692,6 +692,9 @@ if (_stopRequired)
 
 上面所讲述的内容对应的工程已经在github上了（[MCSimpleAudioPlayer](https://github.com/msching/MCSimpleAudioPlayer)），有任何问题可以给我发issue~
 
+<div class="github-card" data-github="msching/MCSimpleAudioPlayer" data-width="400" data-height="" data-theme="default"></div>
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
 ----
 
 #下篇预告
