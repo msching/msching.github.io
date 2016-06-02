@@ -7,7 +7,7 @@
 	<meta name="author" content="ChengYinZju">
 
 	
-	<meta name="description" content="Jun 25th, 2014 Audio, iOS 初始化AudioUnit的正确姿势 在使用AudioUnit的过程中发现当app在后台时调用extern OSStatus AudioUnitInitialize(AudioUnit inUnit)方法返回561015905错误码， &hellip;">
+	<meta name="description" content="Jun 26th, 2014 Audio, iOS iOS8beta1下WebCore可能会打断音频播放 问题 前不久在QA发现一个问题，在iOS8 beta1上使用我们的app播放歌曲时进入某些内嵌的web页面（UIWebview实现）时歌曲会暂停播放，但是界面仍然显示为正在播放状态。 &hellip;">
 	
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,88 @@
 			<div class="mid-col-container">
 				<div id="content" class="inner">
 <div itemscope itemtype="http://schema.org/Blog">
+
+
+    <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-26T16:09:56+08:00" data-updated="true" itemprop="datePublished">Jun 26<span>th</span>, 2014</time></div>
+		<div class="tags">
+
+
+	<a class='category' href='/blog/categories/audio/'>Audio</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>
+
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name"><a href="/blog/2014/06/26/audio-interrput-by-webcore-in-ios-8-beta-1/" itemprop="url">iOS8beta1下WebCore可能会打断音频播放</a></h1>
+	<div class="entry-content" itemprop="articleBody">
+		<h1>问题</h1>
+
+<p>前不久在QA发现一个问题，在iOS8 beta1上使用我们的app播放歌曲时进入某些内嵌的web页面（UIWebview实现）时歌曲会暂停播放，但是界面仍然显示为正在播放状态。把真机连上Xcode6调试后发现在进入部分网页时会再console上打印如下log：</p>
+
+<pre><code>AVAudioSession.mm:623: -[AVAudioSession setActive:withOptions:error:]: Deactivating an audio session that has running I/O. All I/O should be stopped or paused prior to deactivating the audio session.
+</code></pre>
+
+<p>bt后堆栈如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>frame #1: 0x299632fe libAVFAudio.dylib`-[AVAudioSession setActive:error:] + 26
+</span><span class='line'>frame #2: 0x3551b92e WebCore`WebCore::AudioSession::setActive(bool) + 62
+</span><span class='line'>frame #3: 0x35af2674 WebCore`WebCore::MediaSessionManager::updateSessionState() + 100
+</span><span class='line'>frame #4: 0x35af03b6 WebCore`WebCore::MediaSessionManager::addSession(WebCore::MediaSession&) + 74
+</span><span class='line'>frame #5: 0x35af0002 WebCore`WebCore::MediaSession::MediaSession(WebCore::MediaSessionClient&) + 38
+</span><span class='line'>frame #6: 0x35735a20 WebCore`WebCore::HTMLMediaSession::create(WebCore::MediaSessionClient&) + 20
+</span><span class='line'>frame #7: 0x35724c68 WebCore`WebCore::HTMLMediaElement::HTMLMediaElement(WebCore::QualifiedName const&, WebCore::Document&, bool) + 976
+</span><span class='line'>frame #8: 0x3570ad24 WebCore`WebCore::HTMLAudioElement::create(WebCore::QualifiedName const&, WebCore::Document&, bool) + 36
+</span><span class='line'>frame #9: 0x35718184 WebCore`WebCore::audioConstructor(WebCore::QualifiedName const&, WebCore::Document&, WebCore::HTMLFormElement*, bool) + 56
+</span><span class='line'>frame #10: 0x3571803a WebCore`WebCore::HTMLElementFactory::createElement(WebCore::QualifiedName const&, WebCore::Document&, WebCore::HTMLFormElement*, bool) + 230
+</span><span class='line'>frame #11: 0x3533a26c WebCore`WebCore::HTMLDocument::createElement(WTF::AtomicString const&, int&) + 88
+</span><span class='line'>frame #12: 0x3533a1ae WebCore`WebCore::jsDocumentPrototypeFunctionCreateElement(JSC::ExecState*) + 242
+</span><span class='line'>frame #13: 0x2c1cc4d4 JavaScriptCore`llint_entry + 21380</span></code></pre></td></tr></table></div></figure>
+
+
+<p>发现是WebCore调用了<code>AVAudioSession</code>的setActive方法，并且把active置为了NO。这个过程其实类似于音乐在播放时被其他事件打断（例如电话、siri）一样，audio会被打断，同时会发送<code>kAudioSessionBeginInterruption</code>事件通知app音频播放已经被打断，需要修正播放器和UI状态；打断结束后回发送<code>kAudioSessionEndInterruption</code>事件通知app恢复播放状态。区别在于WebCore的打断并没有任何通知，所以就导致界面上的播放状态为播放中而实际音乐却被打断。</p>
+
+<h1>适配</h1>
+
+<p>接下来就要对这个问题进行适配了：</p>
+
+<ol>
+<li>首先，联系了前段组的同事对出现问题的页面进行检查，之后被告知是某个页面的js中调用了一些播放相关的代码导致了这个问题，这些js是之前版本中使用的，现在已经被废弃但没有及时的删除。在删除这些js后，问题自然就消失了。</li>
+<li>客户端本身也应该做一些适配来防止下次再有页面出现类似问题，目前我能想到的办法是做一个<code>AVAudioSession</code>的category，method swizzle方法<code>setActive:withOptions:error:</code>在设置active值时发送通知来修改UI的状态。</li>
+</ol>
+
+
+		
+		
+	</div>
+
+</article>
 
 
     <article class="post" itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
@@ -350,7 +432,7 @@
     <div class="center"><a href="/blog/archives">Blog Archives</a></div>
 </nav></div>
 			</div>
-			<footer id="footer" class="inner">Copyright &copy; 2015
+			<footer id="footer" class="inner">Copyright &copy; 2016
 
     ChengYinZju
 

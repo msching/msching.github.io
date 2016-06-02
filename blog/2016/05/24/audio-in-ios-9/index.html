@@ -1,0 +1,369 @@
+
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>iOS音频播放 (九)：边播边缓存 - 码农人生</title>
+	<meta name="author" content="ChengYinZju">
+
+	
+	<meta name="description" content="May 24th, 2016 Audio, iOS, iOS Audio iOS音频播放 (九)：边播边缓存 Audio Playback in iOS (Part 9) : Cache While Streaming 好久没写过博客了，在这期间有很多同学通过博客评论、微博私信、 &hellip;">
+	
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<link href="/atom.xml" rel="alternate" title="码农人生" type="application/atom+xml">
+	
+	<link rel="canonical" href="http://msching.github.io/blog/2016/05/24/audio-in-ios-9/">
+	<link href="/favicon.png" rel="shortcut icon">
+	<link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+	<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+	<!--[good job! gfw]><script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script><!-->
+	<script src="http://cdn.staticfile.org/jquery/1.9.1/jquery.min.js"></script>
+	<link href="/stylesheets/google-fonts.css" rel="stylesheet" type="text/css">
+	
+</head>
+
+
+<body>
+	<div class="container">
+		<div class="left-col">
+			<div class="intrude-less">
+			<header id="header" class="inner"><div class="profilepic">	
+	<script src="/javascripts/md5.js"></script>
+	<script type="text/javascript">
+		document.write("<img alt='Profile Picture' src='/images/avatar.png' style='width:160px;'/>");
+	</script>
+</div>
+<h1><a href="/">码农人生</a></h1>
+<p class="subtitle">ChengYin's coding life</p>
+<nav id="main-nav"><ul class="main">
+    <li><a href="/">主页  Blog</a></li>
+    <li><a href="/blog/categories">分类  Categories</a></li>
+    <li><a href="/blog/archives">归档  Archives</a></li>
+    <li><a href="/aboutme">关于  About</a></li>
+</ul></nav>
+<nav id="sub-nav">
+	<div class="social">
+		
+		<a class="weibo" href="http://www.weibo.com/msching" title="Weibo">Weibo</a>
+		
+		
+		
+		
+		
+		<a class="github" href="https://github.com/msching" title="GitHub">GitHub</a>
+		
+		
+		
+		
+		
+		
+		
+		<a class="rss" href="/atom.xml" title="RSS">RSS</a>
+		
+	</div>
+</nav>
+<p class="description">Where there is a will, there is a way. -- Thomas Edison</p>
+</header>				
+			</div>
+		</div>	
+		<div class="mid-col">
+			
+				
+			
+			<div class="mid-col-container">
+				<div id="content" class="inner"><article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+	<div class="meta">
+		<div class="date">
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-05-24T09:46:48+08:00" data-updated="true" itemprop="datePublished">May 24<span>th</span>, 2016</time></div>
+		<div class="tags">
+
+
+	<a class='category' href='/blog/categories/audio/'>Audio</a>, <a class='category' href='/blog/categories/ios/'>iOS</a>, <a class='category' href='/blog/categories/ios-audio/'>iOS Audio</a>
+
+
+</div>
+		
+	</div>
+	<h1 class="title" itemprop="name">iOS音频播放 (九)：边播边缓存</h1>
+	<p class="subtitle" itemprop="name">Audio Playback in iOS (Part 9) : Cache While Streaming</p>
+	<hr />
+	<div class="entry-content" itemprop="articleBody"><p>好久没写过博客了，在这期间有很多同学通过博客评论、微博私信、邮件和我交流iOS音频方面的相关问题，其中被问到最多的是如何实现“边播边缓存”，这篇就来说一说这个话题。顺便一提，本文的题目虽然为“iOS音频播放”，但其中所涉及的部分技术方案在OSX平台或者在流播放视频下同样适用。</p>
+
+<!--more-->
+
+
+<hr />
+
+<h1>我能想到的方案</h1>
+
+<p>这类的技术方案其实有不少（其实在<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>的末尾也略微有所涉及）：</p>
+
+<p>思路1. 最直接的方式，自行实现音频数据的请求在请求的过程中把数据缓存到磁盘，然后基于磁盘的数据自己实现解码、播放等功能；这个方法作为直接也最为复杂，开发者需要对音频播放的原理、操作系统等知识有一定程度的理解。如果能够实现这种方式所达到的效果也将会是最好的，整个过程都由开发者掌控，出现问题也可以对症下药。开源播放器<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>就是一个很好的例子，使用带有cache功能开源播放器或在其基础上进行二次开发也是不错的选择；</p>
+
+<p>思路2. 请求拦截的方式，首先你需要一个能够进行流播放的播放器（如Apple提供的<a href="https://developer.apple.com/library/ios/documentation/AVFoundation/Reference/AVPlayer_Class/">AVPlayer</a>），通过拦截播放器发送的请求可以知道需要下载哪一段数据，于是就可以根据本地缓存文件的情况分段为播放器提供数据，如遇到已缓存的数据段直接从缓存中获取数据塞回给播放器，如遇到未缓存的数据段就发送请求获取数据，得到response和数据后保存到磁盘同时塞回给播放器。这种思路下有三个分支：</p>
+
+<p>思路2.1 流播放器 + LocalServer，首先在搭建一个LocalServer（例如使用<a href="https://github.com/swisspol/GCDWebServer">GCDWebServer</a>），然后将URL组织成类似这种形式：</p>
+
+<blockquote><p><a href="http://localhost:port?url=urlEncode">http://localhost:port?url=urlEncode</a>(audioUrl)</p></blockquote>
+
+<p>把组织好的URL交个播放器播放，播放器把请求发送到LocalServer上，LocalServer解析到实际的音频地址后发送请求或者读取已缓存的数据。</p>
+
+<p>思路2.2 流播放器 + NSURLProtocol，大家都知道<a href="https://developer.apple.com/library/mac/documentation/Cocoa/Reference/Foundation/Classes/NSURLProtocol_Class/">NSURLProtocol</a>可以拦截Cocoa平台下<a href="https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/URLLoadingSystem/URLLoadingSystem.html">URL Loading System</a>中的请求，如果播放器的请求是运行在<code>URL Loading System</code>下的话使用这个方法可以轻松的拦截到播放器所发送的请求然后自己再进行请求或者读取缓存数据。这里需要注意如果使用AVPlayer作为播放器的话这种方法只在模拟器上才work，真机上并不能拦截到任何请求。这也证明AVPlayer在真机上并没有运行在<code>URL Loading System</code>下，但模拟器上却是（不知道在OSX下是否能work，有兴趣的同学可以尝试一下）。</p>
+
+<p>注：如果播放器使用的是CFNetwork，也可以尝试拦截，例如使用FB的<a href="https://github.com/facebook/fishhook">fishhook</a>，这hook方法应该会遇上不少坑，请做好心理准备。。</p>
+
+<p>思路2.3 AVPlayer + AVAssetResourceLoader，<a href="https://developer.apple.com/library/ios/documentation/AVFoundation/Reference/AVAssetResourceLoader_Class/">AVAssetResourceLoader</a>是iOS 6之后添加的类其主要作用是让开发者能够掌控<code>AVURLAsset</code>加载数据的整个过程。这正好符合我们的需求，<code>AVAssetResourceLoader</code>会通过delegate把<code>AVAssetResourceLoadingRequest</code>对象传递给开发者，开发者可以根据其中的一些属性得知需要加载的数据段。在得到数据后也可以通过<code>AVAssetResourceLoadingRequest</code>向AVPlayer传递response和数据。</p>
+
+<p>思路3. 取巧的方式，自行实现音频数据的请求在请求的过程中把数据缓存到磁盘，然后使用系统提供的播放器（如AVAudioPlayer、AVPlayer进行播放）。这种实现方式中需要注意的是要播放的音频文件需要预先缓存一定量之后才能够播放，具体缓存多少完全频个人感觉，并且有可能会产生播放失败或者播放错误。这种方式的另一个缺点是无法进行任意的seek；</p>
+
+<hr />
+
+<h1>方案的选择</h1>
+
+<p>上面提到了3种思路共5个方案，那么在实际开发过程中开发者应该可以根据各个方案的优劣结合自己的实际情况选择最适合自己的方案。</p>
+
+<p>思路1：优点在于整个播放过程可控，出现问题可调试，但开发复杂度较高，故选择有对应功能的开源播放器是一个比较好途径。在使用开源播放器之前最好能阅读其代码，掌握整个播放流程，出了问题才能迅速定位。推荐以播放为核心功能的app使用此方案；</p>
+
+<p>思路2：优点在于开发者不必关心播放的整个过程，对音频播放的相关知识也不必有太多的了解，整个开发过程只要关心请求的解析、缓存数据的读取和保存以及数据的回填即可；至于缺点，首先你的有一个靠谱的流播放器，如果使用AVPlayer那么请做踩坑准备；</p>
+
+<p>思路2.1：各类流播放器通吃，如果方案2.2和2.3不管用2.1是最好的选择；</p>
+
+<p>思路2.2：需要播放器有指定的请求方式，如运行在<code>URL Loading System</code>下；</p>
+
+<p>思路2.3：如果你用的就是AVPlayer那么可以尝试使用这个思路，但对于播放列表形式(M3U8)的音频这种方式是无效的；</p>
+
+<p>思路3：如果你选择这条路，那说明你真的懒得不行。。。</p>
+
+<hr />
+
+<h1>思路2缓存和数据读取细节</h1>
+
+<p>一般音频流或者视频流都会支持HTTP协议中的<a href="https://en.wikipedia.org/wiki/List_of_HTTP_header_fields#range-request-header">Range request header</a>，所以大多数的流播放器都会对<code>Range header</code>进行支持，在数据源支持Range的情况下拦截到请求时有必要注意播放器所请求的数据段并根据当前数据缓存的状态进行分段处理。</p>
+
+<p>举个例子，播放器请求bytes=0-100，其中10-20、50-60已经被缓存，那么这个请求就应该被分为下面几段来处理：</p>
+
+<ol>
+<li>0-10，网络请求</li>
+<li>10-20，本地缓存</li>
+<li>20-50，网络请求</li>
+<li>50-60，本地缓存</li>
+<li>60-100，网络请求</li>
+</ol>
+
+
+<p>以上几段数据请求按顺序执行并进行数据回填，其中通过网络请求的数据在收到之后加入缓存以便下一次请求再次使用。另外要注意的是由于播放器本身只发送了一个请求所以response还是只有一个并且Content-Range还是应该为<code>0-100/FileLength</code>。</p>
+
+<hr />
+
+<h1>AVAssetResourceLoader踩坑</h1>
+
+<div class="github-card" data-github="msching/AVPlayerCacheSupport" data-width="400" data-height="" data-theme="default"></div>
+
+
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
+
+<p><a href="https://github.com/msching/AVPlayerCacheSupport">AVPlayerCacheSupport</a>是我使用<code>AVAssetResourceLoader</code>进行实践后实现的一个开源项目，在开发的过程中踩到的坑也在这里分享给大家。</p>
+
+<h3>shceme必须自定义</h3>
+
+<p>非自定义的URL Scheme不会触发AVAssetResourceLoader的delegate方法。这一点并不难发现，Stackoverflow上和github上都有提到这一点。所以在构造AVPlayItem时必须使用自定义Scheme的URL才行，这里我是在原有的Scheme后加上了<code>-streaming</code>，在收到AVAssetResourceLoader的回调之后实际发送请求时再把<code>-streaming</code>后缀去掉。</p>
+
+<h3>AVURLAsset.resourceLoader的delegate必须在AVPlayerItem生成前赋值</h3>
+
+<p>看代码感受一下吧，这样写能接到回调：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">AVURLAsset</span> <span class="o">*</span><span class="n">asset</span> <span class="o">=</span> <span class="p">[</span><span class="n">AVURLAsset</span> <span class="nl">URLAssetWithURL:</span><span class="n">url</span><span class="p">]</span> <span class="nl">options:</span><span class="n">options</span><span class="p">];</span>
+</span><span class='line'><span class="p">[</span><span class="n">asset</span><span class="p">.</span><span class="n">resourceLoader</span> <span class="nl">setDelegate:</span><span class="n">self</span> <span class="nl">queue:</span><span class="n">dispatch_get_main_queue</span><span class="p">()];</span>
+</span><span class='line'><span class="n">AVPlayerItem</span> <span class="o">*</span><span class="n">item</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span> <span class="nl">playerItemWithAsset:</span><span class="n">asset</span><span class="p">];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>下面这种写法是无法接到回调的：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">AVURLAsset</span> <span class="o">*</span><span class="n">asset</span> <span class="o">=</span> <span class="p">[</span><span class="n">AVURLAsset</span> <span class="nl">URLAssetWithURL:</span><span class="n">url</span><span class="p">]</span> <span class="nl">options:</span><span class="n">options</span><span class="p">];</span>
+</span><span class='line'><span class="n">AVPlayerItem</span> <span class="o">*</span><span class="n">item</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span> <span class="nl">playerItemWithAsset:</span><span class="n">asset</span><span class="p">];</span>
+</span><span class='line'><span class="p">[[(</span><span class="n">AVURLAsset</span> <span class="o">*</span><span class="p">)</span><span class="n">item</span><span class="p">.</span><span class="n">asset</span> <span class="n">resourceLoader</span><span class="p">]</span> <span class="nl">setDelegate:</span><span class="n">self</span> <span class="nl">queue:</span><span class="n">dispatch_get_main_queue</span><span class="p">()];</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h3>不支持Playlist类型的播放</h3>
+
+<p>AVAssetResourceLoader不支持类似M3U和M3U8这类播放列表类型的流，这个问题的回答来自<a href="http://stackoverflow.com/a/30239876">SO链接</a>，<a href="https://developer.apple.com/library/ios/technotes/tn2232/_index.html#//apple_ref/doc/uid/DTS40012884-CH1-SECHTTPLIVESTREAMING">官方文档</a>中关于HTTP Live Streaming的一段话也印证了这一点。</p>
+
+<p>在搜索相关问题之前，我尝试了使用AVAssetResourceLoader去加载M3U8播放列表，其中M3U8文件可以获取到，但并非获取了之后直接存储就完事了，还需要进行一些处理：</p>
+
+<p>M3U8中一般有两种类型的URL：相对地址的URL和绝对地址的URL，其中相对地址的URL不需要处理AVPlayer会根据原先的host（也就是带了-streaming后缀的host）进行请求，这样的请求还是会被AVAssetResourceLoader拦截到。而绝对地址的URL则需要对其中的scheme进行处理使其能够被AVAssetResourceLoader拦截。</p>
+
+<p>处理完所有的URL以后才能把M3U8文件进行保存。</p>
+
+<p>M3U8处理完成之后，就尝试处理其中的一些媒体文件地址，例如ts格式的视频，但经过尝试后发现这类ts的链接并不能被AVAssetResourceLoader拦截到，这才去搜索相关内容后找到了上述的SO链接和官方文档。</p>
+
+<h3>AVAssetResourceLoadingContentInformationRequest的contentLength和contentType</h3>
+
+<p><code>AVAssetResourceLoadingContentInformationRequest</code>是<code>AVAssetResourceLoadingRequest</code>的一个属性</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cm">/*! </span>
+</span><span class='line'><span class="cm"> @property       contentInformationRequest</span>
+</span><span class='line'><span class="cm"> @abstract       An instance of AVAssetResourceLoadingContentInformationRequest that you should populate with information about the resource. The value of this property will be nil if no such information is being requested.</span>
+</span><span class='line'><span class="cm">*/</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">readonly</span><span class="p">,</span> <span class="n">nullable</span><span class="p">)</span> <span class="n">AVAssetResourceLoadingContentInformationRequest</span> <span class="o">*</span><span class="n">contentInformationRequest</span> <span class="n">NS_AVAILABLE</span><span class="p">(</span><span class="mi">10</span><span class="n">_9</span><span class="p">,</span> <span class="mi">7</span><span class="n">_0</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>其作用是告诉AVPlayer当前加载的资源类型、文件大小等信息。</p>
+
+<p><code>AVAssetResourceLoadingContentInformationRequest</code>有这样一个属性：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cm">/*! </span>
+</span><span class='line'><span class="cm"> @property       contentLength</span>
+</span><span class='line'><span class="cm"> @abstract       Indicates the length of the requested resource, in bytes.</span>
+</span><span class='line'><span class="cm"> @discussion Before you finish loading an AVAssetResourceLoadingRequest, if its contentInformationRequest is not nil, you should set the value of this property to the number of bytes contained by the requested resource.</span>
+</span><span class='line'><span class="cm">*/</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">)</span> <span class="kt">long</span> <span class="kt">long</span> <span class="n">contentLength</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>乍看上去可以把当前所请求数据的<code>Content-Length</code>直接赋给这个属性，例如请求range=0-100的那么其<code>Content-Length</code>就是100。如果当前数据无缓存的话，就直接把<code>NSURLResponse</code>的<code>expectedContentLength</code>属性值赋值给了contentLength。</p>
+
+<p>但经过实践发现上面的做法并不正确。对于支持<code>Range</code>的请求，如range=0-100，<code>NSURLResponse</code>的<code>expectedContentLength</code>属性值为100，但这里需要填入的是文件的总长。所以对于response header中包含<code>Content-Range</code>的请求，需要解析出其中的文件总长再赋值给<code>AVAssetResourceLoadingContentInformationRequest</code>的<code>contentLength</code>属性。</p>
+
+<p>接下来是<code>contentType</code>：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="cm">/*! </span>
+</span><span class='line'><span class="cm"> @property       contentType</span>
+</span><span class='line'><span class="cm"> @abstract       A UTI that indicates the type of data contained by the requested resource.</span>
+</span><span class='line'><span class="cm"> @discussion Before you finish loading an AVAssetResourceLoadingRequest, if its contentInformationRequest is not nil, you should set the value of this property to a UTI indicating the type of data contained by the requested resource.</span>
+</span><span class='line'><span class="cm">*/</span>
+</span><span class='line'><span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">,</span> <span class="n">nullable</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">contentType</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这里的<code>contentType</code>是UTI，和<code>NSURLResponse</code>的<code>MIMEType</code>并不相同。需要进行转换：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="n">NSString</span> <span class="o">*</span><span class="n">mimeType</span> <span class="o">=</span> <span class="p">[</span><span class="n">response</span> <span class="n">MIMEType</span><span class="p">];</span>
+</span><span class='line'><span class="n">CFStringRef</span> <span class="n">contentType</span> <span class="o">=</span> <span class="n">UTTypeCreatePreferredIdentifierForTag</span><span class="p">(</span><span class="n">kUTTagClassMIMEType</span><span class="p">,</span> <span class="p">(</span><span class="n">__bridge</span> <span class="n">CFStringRef</span><span class="p">)(</span><span class="n">mimeType</span><span class="p">),</span> <span class="nb">NULL</span><span class="p">);</span>
+</span><span class='line'><span class="n">loadingRequest</span><span class="p">.</span><span class="n">contentInformationRequest</span><span class="p">.</span><span class="n">contentType</span> <span class="o">=</span> <span class="n">CFBridgingRelease</span><span class="p">(</span><span class="n">contentType</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<hr />
+
+<h1>总结</h1>
+
+<p>要说的就这么多，希望能帮到大家 =)。</p>
+</div>
+	
+		<br>
+<br>原创文章，版权声明：自由转载-非商用-非衍生-保持署名 | <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.zh">Creative Commons BY-NC-ND 3.0</a></br>
+	
+
+</article>
+
+	<div class="share">
+	<!-- JiaThis Button BEGIN -->
+	<div class="jiathis_style_24x24">
+		<a class="jiathis_button_qzone"></a>
+		<a class="jiathis_button_tsina"></a>
+		<a class="jiathis_button_tqq"></a>
+		<a class="jiathis_button_weixin"></a>
+		<a class="jiathis_button_renren"></a>
+		<a href="http://www.jiathis.com/share?uid=1925419" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+		<a class="jiathis_counter_style"></a>
+	</div>
+	<script type="text/javascript">
+	var jiathis_config = {data_track_clickback:'true'};
+	</script>
+	<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js?uid=1395452865339302" charset="utf-8"></script>
+	<!-- JiaThis Button END -->
+</div>
+
+
+
+<section id="comment">
+    <h1 class="title">Comments</h1>
+    <!-- 多说评论框 start -->
+	<div class="ds-thread" data-thread-key="/blog/2016/05/24/audio-in-ios-9" data-title="iOS音频播放 (九)：边播边缓存" data-url="http://msching.github.io/blog/2016/05/24/audio-in-ios-9/"></div>
+<!-- 多说评论框 end -->
+<!-- 多说公共JS代码 start (一个网页只需插入一次) -->
+<script type="text/javascript">
+var duoshuoQuery = {short_name:"msching"};
+	(function() {
+		var ds = document.createElement('script');
+		ds.type = 'text/javascript';ds.async = true;
+		ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+		ds.charset = 'UTF-8';
+		(document.getElementsByTagName('head')[0] 
+		 || document.getElementsByTagName('body')[0]).appendChild(ds);
+	})();
+	</script>
+<!-- 多说公共JS代码 end -->
+</section>
+</div>
+			</div>
+			<footer id="footer" class="inner">Copyright &copy; 2016
+
+    ChengYinZju
+
+.
+Powered by <a href="http://octopress.org">Octopress</a>, <a href="https://github.com">GitHub</a>, <a href="https://gitcafe.com">GitCafe</a>.
+<br>Design credit: <a href="http://shashankmehta.in/archive/2012/greyshade.html">Shashank Mehta</a>.</br></footer>
+			<script src="/javascripts/slash.js"></script>
+<script src="/javascripts/jquery.fancybox.pack.js"></script>
+<script type="text/javascript">
+(function($){
+	$('.fancybox').fancybox();
+})(jQuery);
+</script> <!-- Delete or comment this line to disable Fancybox -->
+
+
+
+
+
+
+		</div>
+	</div>
+</body>
+</html>

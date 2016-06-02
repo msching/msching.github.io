@@ -4,7 +4,7 @@
   <title><![CDATA[Category: iOS Audio | 码农人生]]></title>
   <link href="http://msching.github.io/blog/categories/ios-audio/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2015-12-18T17:45:30+08:00</updated>
+  <updated>2016-06-02T18:37:28+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -12,6 +12,176 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[iOS音频播放 (九)：边播边缓存]]></title>
+    <link href="http://msching.github.io/blog/2016/05/24/audio-in-ios-9/"/>
+    <updated>2016-05-24T09:46:48+08:00</updated>
+    <id>http://msching.github.io/blog/2016/05/24/audio-in-ios-9</id>
+    <content type="html"><![CDATA[<p>好久没写过博客了，在这期间有很多同学通过博客评论、微博私信、邮件和我交流iOS音频方面的相关问题，其中被问到最多的是如何实现“边播边缓存”，这篇就来说一说这个话题。顺便一提，本文的题目虽然为“iOS音频播放”，但其中所涉及的部分技术方案在OSX平台或者在流播放视频下同样适用。</p>
+
+<!--more-->
+
+
+<hr />
+
+<h1>我能想到的方案</h1>
+
+<p>这类的技术方案其实有不少（其实在<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>的末尾也略微有所涉及）：</p>
+
+<p>思路1. 最直接的方式，自行实现音频数据的请求在请求的过程中把数据缓存到磁盘，然后基于磁盘的数据自己实现解码、播放等功能；这个方法作为直接也最为复杂，开发者需要对音频播放的原理、操作系统等知识有一定程度的理解。如果能够实现这种方式所达到的效果也将会是最好的，整个过程都由开发者掌控，出现问题也可以对症下药。开源播放器<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>就是一个很好的例子，使用带有cache功能开源播放器或在其基础上进行二次开发也是不错的选择；</p>
+
+<p>思路2. 请求拦截的方式，首先你需要一个能够进行流播放的播放器（如Apple提供的<a href="https://developer.apple.com/library/ios/documentation/AVFoundation/Reference/AVPlayer_Class/">AVPlayer</a>），通过拦截播放器发送的请求可以知道需要下载哪一段数据，于是就可以根据本地缓存文件的情况分段为播放器提供数据，如遇到已缓存的数据段直接从缓存中获取数据塞回给播放器，如遇到未缓存的数据段就发送请求获取数据，得到response和数据后保存到磁盘同时塞回给播放器。这种思路下有三个分支：</p>
+
+<p>思路2.1 流播放器 + LocalServer，首先在搭建一个LocalServer（例如使用<a href="https://github.com/swisspol/GCDWebServer">GCDWebServer</a>），然后将URL组织成类似这种形式：</p>
+
+<blockquote><p><a href="http://localhost:port?url=urlEncode">http://localhost:port?url=urlEncode</a>(audioUrl)</p></blockquote>
+
+<p>把组织好的URL交个播放器播放，播放器把请求发送到LocalServer上，LocalServer解析到实际的音频地址后发送请求或者读取已缓存的数据。</p>
+
+<p>思路2.2 流播放器 + NSURLProtocol，大家都知道<a href="https://developer.apple.com/library/mac/documentation/Cocoa/Reference/Foundation/Classes/NSURLProtocol_Class/">NSURLProtocol</a>可以拦截Cocoa平台下<a href="https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/URLLoadingSystem/URLLoadingSystem.html">URL Loading System</a>中的请求，如果播放器的请求是运行在<code>URL Loading System</code>下的话使用这个方法可以轻松的拦截到播放器所发送的请求然后自己再进行请求或者读取缓存数据。这里需要注意如果使用AVPlayer作为播放器的话这种方法只在模拟器上才work，真机上并不能拦截到任何请求。这也证明AVPlayer在真机上并没有运行在<code>URL Loading System</code>下，但模拟器上却是（不知道在OSX下是否能work，有兴趣的同学可以尝试一下）。</p>
+
+<p>注：如果播放器使用的是CFNetwork，也可以尝试拦截，例如使用FB的<a href="https://github.com/facebook/fishhook">fishhook</a>，这hook方法应该会遇上不少坑，请做好心理准备。。</p>
+
+<p>思路2.3 AVPlayer + AVAssetResourceLoader，<a href="https://developer.apple.com/library/ios/documentation/AVFoundation/Reference/AVAssetResourceLoader_Class/">AVAssetResourceLoader</a>是iOS 6之后添加的类其主要作用是让开发者能够掌控<code>AVURLAsset</code>加载数据的整个过程。这正好符合我们的需求，<code>AVAssetResourceLoader</code>会通过delegate把<code>AVAssetResourceLoadingRequest</code>对象传递给开发者，开发者可以根据其中的一些属性得知需要加载的数据段。在得到数据后也可以通过<code>AVAssetResourceLoadingRequest</code>向AVPlayer传递response和数据。</p>
+
+<p>思路3. 取巧的方式，自行实现音频数据的请求在请求的过程中把数据缓存到磁盘，然后使用系统提供的播放器（如AVAudioPlayer、AVPlayer进行播放）。这种实现方式中需要注意的是要播放的音频文件需要预先缓存一定量之后才能够播放，具体缓存多少完全频个人感觉，并且有可能会产生播放失败或者播放错误。这种方式的另一个缺点是无法进行任意的seek；</p>
+
+<hr />
+
+<h1>方案的选择</h1>
+
+<p>上面提到了3种思路共5个方案，那么在实际开发过程中开发者应该可以根据各个方案的优劣结合自己的实际情况选择最适合自己的方案。</p>
+
+<p>思路1：优点在于整个播放过程可控，出现问题可调试，但开发复杂度较高，故选择有对应功能的开源播放器是一个比较好途径。在使用开源播放器之前最好能阅读其代码，掌握整个播放流程，出了问题才能迅速定位。推荐以播放为核心功能的app使用此方案；</p>
+
+<p>思路2：优点在于开发者不必关心播放的整个过程，对音频播放的相关知识也不必有太多的了解，整个开发过程只要关心请求的解析、缓存数据的读取和保存以及数据的回填即可；至于缺点，首先你的有一个靠谱的流播放器，如果使用AVPlayer那么请做踩坑准备；</p>
+
+<p>思路2.1：各类流播放器通吃，如果方案2.2和2.3不管用2.1是最好的选择；</p>
+
+<p>思路2.2：需要播放器有指定的请求方式，如运行在<code>URL Loading System</code>下；</p>
+
+<p>思路2.3：如果你用的就是AVPlayer那么可以尝试使用这个思路，但对于播放列表形式(M3U8)的音频这种方式是无效的；</p>
+
+<p>思路3：如果你选择这条路，那说明你真的懒得不行。。。</p>
+
+<hr />
+
+<h1>思路2缓存和数据读取细节</h1>
+
+<p>一般音频流或者视频流都会支持HTTP协议中的<a href="https://en.wikipedia.org/wiki/List_of_HTTP_header_fields#range-request-header">Range request header</a>，所以大多数的流播放器都会对<code>Range header</code>进行支持，在数据源支持Range的情况下拦截到请求时有必要注意播放器所请求的数据段并根据当前数据缓存的状态进行分段处理。</p>
+
+<p>举个例子，播放器请求bytes=0-100，其中10-20、50-60已经被缓存，那么这个请求就应该被分为下面几段来处理：</p>
+
+<ol>
+<li>0-10，网络请求</li>
+<li>10-20，本地缓存</li>
+<li>20-50，网络请求</li>
+<li>50-60，本地缓存</li>
+<li>60-100，网络请求</li>
+</ol>
+
+
+<p>以上几段数据请求按顺序执行并进行数据回填，其中通过网络请求的数据在收到之后加入缓存以便下一次请求再次使用。另外要注意的是由于播放器本身只发送了一个请求所以response还是只有一个并且Content-Range还是应该为<code>0-100/FileLength</code>。</p>
+
+<hr />
+
+<h1>AVAssetResourceLoader踩坑</h1>
+
+<div class="github-card" data-github="msching/AVPlayerCacheSupport" data-width="400" data-height="" data-theme="default"></div>
+
+
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
+
+<p><a href="https://github.com/msching/AVPlayerCacheSupport">AVPlayerCacheSupport</a>是我使用<code>AVAssetResourceLoader</code>进行实践后实现的一个开源项目，在开发的过程中踩到的坑也在这里分享给大家。</p>
+
+<h3>shceme必须自定义</h3>
+
+<p>非自定义的URL Scheme不会触发AVAssetResourceLoader的delegate方法。这一点并不难发现，Stackoverflow上和github上都有提到这一点。所以在构造AVPlayItem时必须使用自定义Scheme的URL才行，这里我是在原有的Scheme后加上了<code>-streaming</code>，在收到AVAssetResourceLoader的回调之后实际发送请求时再把<code>-streaming</code>后缀去掉。</p>
+
+<h3>AVURLAsset.resourceLoader的delegate必须在AVPlayerItem生成前赋值</h3>
+
+<p>看代码感受一下吧，这样写能接到回调：</p>
+
+<p><code>objc
+AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url] options:options];
+[asset.resourceLoader setDelegate:self queue:dispatch_get_main_queue()];
+AVPlayerItem *item = [self playerItemWithAsset:asset];
+</code>
+下面这种写法是无法接到回调的：</p>
+
+<p><code>objc
+AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url] options:options];
+AVPlayerItem *item = [self playerItemWithAsset:asset];
+[[(AVURLAsset *)item.asset resourceLoader] setDelegate:self queue:dispatch_get_main_queue()];
+</code></p>
+
+<h3>不支持Playlist类型的播放</h3>
+
+<p>AVAssetResourceLoader不支持类似M3U和M3U8这类播放列表类型的流，这个问题的回答来自<a href="http://stackoverflow.com/a/30239876">SO链接</a>，<a href="https://developer.apple.com/library/ios/technotes/tn2232/_index.html#//apple_ref/doc/uid/DTS40012884-CH1-SECHTTPLIVESTREAMING">官方文档</a>中关于HTTP Live Streaming的一段话也印证了这一点。</p>
+
+<p>在搜索相关问题之前，我尝试了使用AVAssetResourceLoader去加载M3U8播放列表，其中M3U8文件可以获取到，但并非获取了之后直接存储就完事了，还需要进行一些处理：</p>
+
+<p>M3U8中一般有两种类型的URL：相对地址的URL和绝对地址的URL，其中相对地址的URL不需要处理AVPlayer会根据原先的host（也就是带了-streaming后缀的host）进行请求，这样的请求还是会被AVAssetResourceLoader拦截到。而绝对地址的URL则需要对其中的scheme进行处理使其能够被AVAssetResourceLoader拦截。</p>
+
+<p>处理完所有的URL以后才能把M3U8文件进行保存。</p>
+
+<p>M3U8处理完成之后，就尝试处理其中的一些媒体文件地址，例如ts格式的视频，但经过尝试后发现这类ts的链接并不能被AVAssetResourceLoader拦截到，这才去搜索相关内容后找到了上述的SO链接和官方文档。</p>
+
+<h3>AVAssetResourceLoadingContentInformationRequest的contentLength和contentType</h3>
+
+<p><code>AVAssetResourceLoadingContentInformationRequest</code>是<code>AVAssetResourceLoadingRequest</code>的一个属性</p>
+
+<p><code>objc
+/*!
+ @property      contentInformationRequest
+ @abstract      An instance of AVAssetResourceLoadingContentInformationRequest that you should populate with information about the resource. The value of this property will be nil if no such information is being requested.
+*/
+@property (nonatomic, readonly, nullable) AVAssetResourceLoadingContentInformationRequest *contentInformationRequest NS_AVAILABLE(10_9, 7_0);
+</code></p>
+
+<p>其作用是告诉AVPlayer当前加载的资源类型、文件大小等信息。</p>
+
+<p><code>AVAssetResourceLoadingContentInformationRequest</code>有这样一个属性：</p>
+
+<p><code>
+/*!
+ @property      contentLength
+ @abstract      Indicates the length of the requested resource, in bytes.
+ @discussion    Before you finish loading an AVAssetResourceLoadingRequest, if its contentInformationRequest is not nil, you should set the value of this property to the number of bytes contained by the requested resource.
+*/
+@property (nonatomic) long long contentLength;
+</code>
+乍看上去可以把当前所请求数据的<code>Content-Length</code>直接赋给这个属性，例如请求range=0-100的那么其<code>Content-Length</code>就是100。如果当前数据无缓存的话，就直接把<code>NSURLResponse</code>的<code>expectedContentLength</code>属性值赋值给了contentLength。</p>
+
+<p>但经过实践发现上面的做法并不正确。对于支持<code>Range</code>的请求，如range=0-100，<code>NSURLResponse</code>的<code>expectedContentLength</code>属性值为100，但这里需要填入的是文件的总长。所以对于response header中包含<code>Content-Range</code>的请求，需要解析出其中的文件总长再赋值给<code>AVAssetResourceLoadingContentInformationRequest</code>的<code>contentLength</code>属性。</p>
+
+<p>接下来是<code>contentType</code>：</p>
+
+<p><code>objc
+/*!
+ @property      contentType
+ @abstract      A UTI that indicates the type of data contained by the requested resource.
+ @discussion    Before you finish loading an AVAssetResourceLoadingRequest, if its contentInformationRequest is not nil, you should set the value of this property to a UTI indicating the type of data contained by the requested resource.
+*/
+@property (nonatomic, copy, nullable) NSString *contentType;
+</code></p>
+
+<p>这里的<code>contentType</code>是UTI，和<code>NSURLResponse</code>的<code>MIMEType</code>并不相同。需要进行转换：</p>
+
+<p>```objc
+NSString *mimeType = [response MIMEType];
+CFStringRef contentType = UTTypeCreatePreferredIdentifierForTag(kUTTagClassMIMEType, (__bridge CFStringRef)(mimeType), NULL);
+loadingRequest.contentInformationRequest.contentType = CFBridgingRelease(contentType);</p>
+
+<h2>```</h2>
+
+<h1>总结</h1>
+
+<p>要说的就这么多，希望能帮到大家 =)。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[iOS音频播放 (八)：NowPlayingCenter和RemoteControl]]></title>
@@ -322,6 +492,12 @@ UIKIT_EXTERN int UIApplicationMain(int argc, char *argv[], NSString *principalCl
 <h1>示例代码</h1>
 
 <p>git上有一个关于remotecontrol的小工程供大家参考<a href="https://github.com/MosheBerman/ios-audio-remote-control">ios-audio-remote-control</a></p>
+
+<div class="github-card" data-github="MosheBerman/ios-audio-remote-control" data-width="400" data-height="" data-theme="default"></div>
+
+
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
 
 <hr />
 
@@ -1420,6 +1596,12 @@ else
 
 <p>上面所讲述的内容对应的工程已经在github上了（<a href="https://github.com/msching/MCSimpleAudioPlayer">MCSimpleAudioPlayer</a>），有任何问题可以给我发issue~</p>
 
+<div class="github-card" data-github="msching/MCSimpleAudioPlayer" data-width="400" data-height="" data-theme="default"></div>
+
+
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
+
 <hr />
 
 <h1>下篇预告</h1>
@@ -1785,7 +1967,29 @@ kAudioQueueParam_Pan            = 13
 
 <h1>示例代码</h1>
 
-<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>都用到了AudioQueue。在上面提到的Demo中也有我自己做的封装<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>。</p>
+<p><a href="https://github.com/mattgallagher/AudioStreamer">AudioStreamer</a>和<a href="https://github.com/muhku/FreeStreamer">FreeStreamer</a>都用到了AudioQueue。</p>
+
+<div class="github-card" data-github="mattgallagher/AudioStreamer" data-width="400" data-height="" data-theme="default"></div>
+
+
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
+
+
+
+<div class="github-card" data-github="muhku/FreeStreamer" data-width="400" data-height="" data-theme="default"></div>
+
+
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
+
+<p>在上面提到的Demo中也有我自己做的封装<a href="https://github.com/msching/MCSimpleAudioPlayer/blob/master/MCSimpleAudioPlayerDemo/MCSimpleAudioPlayer/MCAudioOutputQueue.h">MCAudioOutputQueue</a>。</p>
+
+<div class="github-card" data-github="msching/MCSimpleAudioPlayer" data-width="400" data-height="" data-theme="default"></div>
+
+
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+
 
 <hr />
 
@@ -1802,495 +2006,6 @@ kAudioQueueParam_Pan            = 13
 <p><a href="https://developer.apple.com/library/ios/documentation/MusicAudio/Conceptual/AudioQueueProgrammingGuide/AboutAudioQueues/AboutAudioQueues.html#//apple_ref/doc/uid/TP40005343-CH5-SW9">About Audio Queues</a></p>
 
 <p><a href="http://zh.wikipedia.org/zh/%E7%94%9F%E4%BA%A7%E8%80%85%E6%B6%88%E8%B4%B9%E8%80%85%E9%97%AE%E9%A2%98">生产者消费者问题</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[iOS音频播放 (四)：AudioFile]]></title>
-    <link href="http://msching.github.io/blog/2014/07/19/audio-in-ios-4/"/>
-    <updated>2014-07-19T13:38:30+08:00</updated>
-    <id>http://msching.github.io/blog/2014/07/19/audio-in-ios-4</id>
-    <content type="html"><![CDATA[<p>接着<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>的<code>AudioStreamFile</code>这一篇要来聊一下<code>AudioFile</code>。和<code>AudioStreamFile</code>一样<code>AudioFile</code>是<code>AudioToolBox</code> framework中的一员，它也能够完成<a href="/blog/2014/07/07/audio-in-ios/">第一篇</a>所述的第2步，读取音频格式信息和进行帧分离，但事实上它的功能远不止如此。</p>
-
-<!--more-->
-
-
-<hr />
-
-<h1>AudioFile介绍</h1>
-
-<p>按照<a href="https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL">官方文档</a>的描述：</p>
-
-<p><code>a C programming interface that enables you to read or write a wide variety of audio data to or from disk or a memory buffer.With Audio File Services you can:</code></p>
-
-<ul>
-<li>Create, initialize, open, and close audio files</li>
-<li>Read and write audio files</li>
-<li>Optimize audio files</li>
-<li>Work with user data and global information</li>
-</ul>
-
-
-<p>这个类可以用来创建、初始化音频文件；读写音频数据；对音频文件进行优化；读取和写入音频格式信息等等，功能十分强大，可见它不但可以用来支持音频播放，甚至可以用来生成音频文件。当然，在本篇文章中只会涉及一些和音频播放相关的内容（打开音频文件、读取格式信息、读取音频数据，其实我也只对这些方法有一点了解，其余的功能没用过。。>_&lt;）.</p>
-
-<hr />
-
-<h1>AudioFile的打开“姿势”</h1>
-
-<p><code>AudioFile</code>提供了两个打开文件的方法：</p>
-
-<p>1、 <code>AudioFileOpenURL</code></p>
-
-<p>```objc</p>
-
-<p>enum {</p>
-
-<pre><code>kAudioFileReadPermission      = 0x01,
-kAudioFileWritePermission     = 0x02,
-kAudioFileReadWritePermission = 0x03
-</code></pre>
-
-<p>};</p>
-
-<p>extern OSStatus AudioFileOpenURL (CFURLRef inFileRef,</p>
-
-<pre><code>                                SInt8 inPermissions,
-                                AudioFileTypeID inFileTypeHint,
-                                AudioFileID * outAudioFile);
-</code></pre>
-
-<p>```</p>
-
-<p>从方法的定义上来看是用来读取本地文件的：</p>
-
-<p>第一个参数，文件路径；</p>
-
-<p>第二个参数，文件的允许使用方式，是读、写还是读写，如果打开文件后进行了允许使用方式以外的操作，就得到<code>kAudioFilePermissionsError</code>错误码（比如Open时声明是<code>kAudioFileReadPermission</code>但却调用了<code>AudioFileWriteBytes</code>）；</p>
-
-<p>第三个参数，和<code>AudioFileStream</code>的open方法中一样是一个帮助<code>AudioFile</code>解析文件的类型提示，如果文件类型确定的话应当传入；</p>
-
-<p>第四个参数，返回AudioFile实例对应的<code>AudioFileID</code>，这个ID需要保存起来作为后续一些方法的参数使用；</p>
-
-<p>返回值用来判断是否成功打开文件（OSSStatus == noErr）。</p>
-
-<hr />
-
-<p>2、 <code>AudioFileOpenWithCallbacks</code></p>
-
-<p>```objc
-extern OSStatus AudioFileOpenWithCallbacks (void * inClientData,</p>
-
-<pre><code>                                          AudioFile_ReadProc inReadFunc,
-                                          AudioFile_WriteProc inWriteFunc,
-                                          AudioFile_GetSizeProc inGetSizeFunc,
-                                          AudioFile_SetSizeProc inSetSizeFunc,
-                                          AudioFileTypeID inFileTypeHint,
-                                          AudioFileID * outAudioFile);
-</code></pre>
-
-<p>```</p>
-
-<p>看过第一个Open方法后，这个方法乍看上去让人有点迷茫，没有URL的参数如何告诉AudioFile该打开哪个文件？还是先来看一下参数的说明吧：</p>
-
-<p>第一个参数，上下文信息，不再多做解释；</p>
-
-<p>第二个参数，当<code>AudioFile</code>需要读音频数据时进行的回调（调用Open和Read方式后<code>同步</code>回调）；</p>
-
-<p>第三个参数，当<code>AudioFile</code>需要写音频数据时进行的回调（写音频文件功能时使用，暂不讨论）；</p>
-
-<p>第四个参数，当<code>AudioFile</code>需要用到文件的总大小时回调（调用Open和Read方式后<code>同步</code>回调）；</p>
-
-<p>第五个参数，当<code>AudioFile</code>需要设置文件的大小时回调（写音频文件功能时使用，暂不讨论）；</p>
-
-<p>第六、七个参数和返回值同<code>AudioFileOpenURL</code>方法；</p>
-
-<p>这个方法的重点在于<code>AudioFile_ReadProc</code>这个回调。换一个角度理解，这个方法相比于第一个方法自由度更高，AudioFile需要的只是一个数据源，无论是磁盘上的文件、内存里的数据甚至是网络流只要能在<code>AudioFile</code>需要数据时（Open和Read时）通过<code>AudioFile_ReadProc</code>回调为AudioFile提供合适的数据就可以了，也就是说使用方法不仅仅可以读取本地文件也可以如<code>AudioFileStream</code>一样以流的形式读取数据。</p>
-
-<hr />
-
-<p>下面来看一下<code>AudioFile_GetSizeProc</code>和<code>AudioFile_ReadProc</code>这两个读取功能相关的回调
-```objc
-typedef SInt64 (*AudioFile_GetSizeProc)(void * inClientData);</p>
-
-<p>typedef OSStatus (*AudioFile_ReadProc)(void * inClientData,</p>
-
-<pre><code>                                     SInt64 inPosition,
-                                     UInt32 requestCount,
-                                     void * buffer, 
-                                     UInt32 * actualCount);
-</code></pre>
-
-<p>```</p>
-
-<p>首先是<code>AudioFile_GetSizeProc</code>回调，这个回调很好理解，返回文件总长度即可，总长度的获取途径自然是文件系统或者httpResponse等等。</p>
-
-<p>接下来是<code>AudioFile_ReadProc</code>回调：</p>
-
-<p>第一个参数，上下文对象，不再赘述；</p>
-
-<p>第二个参数，需要读取第几个字节开始的数据；</p>
-
-<p>第三个参数，需要读取的数据长度；</p>
-
-<p>第四个参数，返回参数，是一个数据指针并且其空间已经被分配，我们需要做的是把数据memcpy到buffer中；</p>
-
-<p>第五个参数，实际提供的数据长度，即memcpy到buffer中的数据长度；</p>
-
-<p>返回值，如果没有任何异常产生就返回noErr，如果有异常可以根据异常类型选择需要的error常量返回（一般用不到其他返回值，返回noErr就足够了）；</p>
-
-<p>这里需要解释一下这个回调方法的工作方式。<code>AudioFile</code>需要数据时会调用回调方法，需要数据的时间点有两个：</p>
-
-<ol>
-<li><p>Open方法调用时，由于<code>AudioFile</code>的Open方法调用过程中就会对音频格式信息进行解析，只有符合要求的音频格式才能被成功打开否则Open方法就会返回错误码（换句话说，Open方法一旦调用成功就相当于<code>AudioStreamFile</code>在Parse后返回<code>ReadyToProducePackets</code>一样，只要Open成功就可以开始读取音频数据，详见<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>），所以在Open方法调用的过程中就需要提供一部分音频数据来进行解析；</p></li>
-<li><p>Read相关方法调用时，这个不需要多说很好理解；</p></li>
-</ol>
-
-
-<p>通过回调提供数据时需要注意inPosition和requestCount参数，这两个参数指明了本次回调需要提供的数据范围是从inPosition开始requestCount个字节的数据。这里又可以分为两种情况：</p>
-
-<ol>
-<li><p>有充足的数据：那么我们需要把这个范围内的数据拷贝到buffer中，并且给actualCount赋值requestCount，最后返回noError；</p></li>
-<li><p>数据不足：没有充足数据的话就只能把手头有的数据拷贝到buffer中，需要注意的是这部分被拷贝的数据必须是从inPosition开始的<code>连续数据</code>，拷贝完成后给actualCount赋值实际拷贝进buffer中的数据长度后返回noErr，这个过程可以用下面的代码来表示：</p></li>
-</ol>
-
-
-<p>```objc
-static OSStatus MyAudioFileReadCallBack(void *inClientData,</p>
-
-<pre><code>                                    SInt64 inPosition,
-                                    UInt32 requestCount,
-                                    void *buffer,
-                                    UInt32 *actualCount)
-</code></pre>
-
-<p>{</p>
-
-<pre><code>__unsafe_unretained MyContext *context = (__bridge MyContext *)inClientData;
-
-*actualCount = [context availableDataLengthAtOffset:inPosition maxLength:requestCount];
-if (*actualCount &gt; 0)
-{
-    NSData *data = [context dataAtOffset:inPosition length:*actualCount];
-    memcpy(buffer, [data bytes], [data length]);
-}
-
-return noErr;
-</code></pre>
-
-<p>}</p>
-
-<p>```</p>
-
-<p>说到这里又需要分两种情况：</p>
-
-<p>2.1. Open方法调用时的回调数据不足：AudioFile的Open方法会根据文件格式类型分几步进行数据读取以解析确定是否是一个合法的文件格式，其中每一步的inPosition和requestCount都不一样，如果某一步不成功就会直接进行下一步，如果几部下来都失败了，那么Open方法就会失败。简单的说就是在调用Open之前首先需要保证音频文件的格式信息完整，这就意味着<code>AudioFile</code>并不能独立用于音频流的读取，在流播放时首先需要使用<code>AudioStreamFile</code>来得到<code>ReadyToProducePackets</code>标志位来保证信息完整；</p>
-
-<p>2.2. Read方法调用时的回调数据不足：这种情况下inPosition和requestCount的数值与Read方法调用时传入的参数有关，数据不足对于Read方法本身没有影响，只要回调返回noErr，Read就成功，只是实际交给Read方法的调用方的数据会不足，那么就把这个问题的处理交给了Read的调用方；</p>
-
-<hr />
-
-<h1>读取音频格式信息</h1>
-
-<p>成功打开音频文件后就可以读取其中的格式信息了，读取用到的方法如下：</p>
-
-<p>```objc
-extern OSStatus AudioFileGetPropertyInfo(AudioFileID inAudioFile,</p>
-
-<pre><code>                                       AudioFilePropertyID inPropertyID,
-                                       UInt32 * outDataSize,
-                                       UInt32 * isWritable);
-</code></pre>
-
-<p>extern OSStatus AudioFileGetProperty(AudioFileID inAudioFile,</p>
-
-<pre><code>                                   AudioFilePropertyID inPropertyID,
-                                   UInt32 * ioDataSize,
-                                   void * outPropertyData); 
-</code></pre>
-
-<p><code>``
-</code>AudioFileGetPropertyInfo<code>方法用来获取某个属性对应的数据的大小（outDataSize）以及该属性是否可以被write（isWritable），而</code>AudioFileGetProperty<code>则用来获取属性对应的数据。对于一些大小可变的属性需要先使用</code>AudioFileGetPropertyInfo<code>获取数据大小才能取获取数据（例如formatList），而有些确定类型单个属性则不必先调用</code>AudioFileGetPropertyInfo<code>直接调用</code>AudioFileGetProperty`即可（比如BitRate），例子如下：</p>
-
-<p>```objc
-AudioFileID fileID; //Open方法返回的AudioFileID</p>
-
-<p>//获取格式信息
-UInt32 formatListSize = 0;
-OSStatus status = AudioFileGetPropertyInfo(_fileID, kAudioFilePropertyFormatList, &amp;formatListSize, NULL);
-if (status == noErr)
-{</p>
-
-<pre><code>AudioFormatListItem *formatList = (AudioFormatListItem *)malloc(formatListSize);
-status = AudioFileGetProperty(fileID, kAudioFilePropertyFormatList, &amp;formatListSize, formatList);
-if (status == noErr)
-{
-    for (int i = 0; i * sizeof(AudioFormatListItem) &lt; formatListSize; i += sizeof(AudioFormatListItem))
-    {
-        AudioStreamBasicDescription pasbd = formatList[i].mASBD;
-        //选择需要的格式。。                             
-    }
-}
-free(formatList);
-</code></pre>
-
-<p>}</p>
-
-<p>//获取码率
-UInt32 bitRate;
-UInt32 bitRateSize = sizeof(bitRate);
-status = AudioFileGetProperty(fileID, kAudioFilePropertyBitRate, &amp;size, &amp;bitRate);
-if (status != noErr)
-{</p>
-
-<pre><code>//错误处理
-</code></pre>
-
-<p>}
-```
-可以获取的属性有下面这些，大家可以参考文档来获取自己需要的信息（注意到这里有EstimatedDuration，可以得到Duration了）：</p>
-
-<p>```
-enum
-{</p>
-
-<pre><code>kAudioFilePropertyFileFormat                =   'ffmt',
-kAudioFilePropertyDataFormat                =   'dfmt',
-kAudioFilePropertyIsOptimized           =   'optm',
-kAudioFilePropertyMagicCookieData       =   'mgic',
-kAudioFilePropertyAudioDataByteCount        =   'bcnt',
-kAudioFilePropertyAudioDataPacketCount  =   'pcnt',
-kAudioFilePropertyMaximumPacketSize     =   'psze',
-kAudioFilePropertyDataOffset                =   'doff',
-kAudioFilePropertyChannelLayout         =   'cmap',
-kAudioFilePropertyDeferSizeUpdates      =   'dszu',
-kAudioFilePropertyMarkerList                =   'mkls',
-kAudioFilePropertyRegionList                =   'rgls',
-kAudioFilePropertyChunkIDs              =   'chid',
-kAudioFilePropertyInfoDictionary            =   'info',
-kAudioFilePropertyPacketTableInfo       =   'pnfo',
-kAudioFilePropertyFormatList                =   'flst',
-kAudioFilePropertyPacketSizeUpperBound      =   'pkub',
-kAudioFilePropertyReserveDuration       =   'rsrv',
-kAudioFilePropertyEstimatedDuration     =   'edur',
-kAudioFilePropertyBitRate               =   'brat',
-kAudioFilePropertyID3Tag                    =   'id3t',
-kAudioFilePropertySourceBitDepth            =   'sbtd',
-kAudioFilePropertyAlbumArtwork          =   'aart',
-</code></pre>
-
-<p>  kAudioFilePropertyAudioTrackCount         =    &lsquo;atct&rsquo;,</p>
-
-<pre><code>kAudioFilePropertyUseAudioTrack         =   'uatk'
-</code></pre>
-
-<p>};<br/>
-```</p>
-
-<hr />
-
-<h1>读取音频数据</h1>
-
-<p>读取音频数据的方法分为两类：</p>
-
-<p>1、直接读取音频数据：</p>
-
-<p>```objc
-extern OSStatus AudioFileReadBytes (AudioFileID inAudioFile,</p>
-
-<pre><code>                                  Boolean inUseCache,
-                                  SInt64 inStartingByte,
-                                  UInt32 * ioNumBytes,
-                                  void * outBuffer);
-</code></pre>
-
-<p>```</p>
-
-<p>第一个参数，FileID；</p>
-
-<p>第二个参数，是否需要cache，一般来说传false；</p>
-
-<p>第三个参数，从第几个byte开始读取数据</p>
-
-<p>第四个参数，这个参数在调用时作为输入参数表示需要读取读取多少数据，调用完成后作为输出参数表示实际读取了多少数据（即Read回调中的requestCount和actualCount）；</p>
-
-<p>第五个参数，buffer指针，需要事先分配好足够大的内存（ioNumBytes大，即Read回调中的buffer，所以Read回调中不需要再分配内存）；</p>
-
-<p>返回值表示是否读取成功，EOF时会返回<code>kAudioFileEndOfFileError</code>；</p>
-
-<p>使用这个方法得到的数据都是没有进行过帧分离的数据，如果想要用来播放或者解码还必须通过<code>AudioFileStream</code>进行帧分离；</p>
-
-<p>2、按帧（Packet）读取音频数据：</p>
-
-<p>```objc
-extern OSStatus AudioFileReadPacketData (AudioFileID inAudioFile,</p>
-
-<pre><code>                                       Boolean inUseCache,
-                                       UInt32 * ioNumBytes,
-                                       AudioStreamPacketDescription * outPacketDescriptions,
-                                       SInt64 inStartingPacket,
-                                       UInt32 * ioNumPackets,
-                                       void * outBuffer);
-</code></pre>
-
-<p>extern OSStatus AudioFileReadPackets (AudioFileID inAudioFile,</p>
-
-<pre><code>                                    Boolean inUseCache,
-                                    UInt32 * outNumBytes,
-                                    AudioStreamPacketDescription * outPacketDescriptions,
-                                    SInt64 inStartingPacket, 
-                                    UInt32 * ioNumPackets, 
-                                    void * outBuffer);
-</code></pre>
-
-<p>```
-按帧读取的方法有两个，这两个方法看上去差不多，就连参数也几乎相同，但使用场景和效率上却有所不同，<a href="https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL">官方文档</a>中如此描述这两个方法：</p>
-
-<ul>
-<li><code>AudioFileReadPacketData</code> is memory efficient when reading variable bit-rate (VBR) audio data;</li>
-<li><code>AudioFileReadPacketData</code> is more efficient than <code>AudioFileReadPackets</code> when reading compressed file formats that do not have packet tables, such as MP3 or ADTS. This function is a good choice for reading either CBR (constant bit-rate) or VBR data if you do not need to read a fixed duration of audio.</li>
-<li>Use <code>AudioFileReadPackets</code> only when you need to read a fixed duration of audio data, or when you are reading only uncompressed audio.</li>
-</ul>
-
-
-<p>只有当需要读取固定时长音频或者非压缩音频时才会用到<code>AudioFileReadPackets</code>，其余时候使用<code>AudioFileReadPacketData</code>会有更高的效率并且更省内存；</p>
-
-<p>下面来看看这些参数：</p>
-
-<p>第一、二个参数，同<code>AudioFileReadBytes</code>；</p>
-
-<p>第三个参数，对于<code>AudioFileReadPacketData</code>来说ioNumBytes这个参数在输入输出时都要用到，在输入时表示outBuffer的size，输出时表示实际读取了多少size的数据。而对<code>AudioFileReadPackets</code>来说outNumBytes只在输出时使用，表示实际读取了多少size的数据；</p>
-
-<p>第四个参数，帧信息数组指针，在输入前需要分配内存，大小必须足够存在ioNumPackets个帧信息（ioNumPackets * sizeof(AudioStreamPacketDescription)）；</p>
-
-<p>第五个参数，从第几帧开始读取数据；</p>
-
-<p>第六个参数，在输入时表示需要读取多少个帧，在输出时表示实际读取了多少帧；</p>
-
-<p>第七个参数，outBuffer数据指针，在输入前就需要分配好空间，这个参数看上去两个方法一样但其实并非如此。对于<code>AudioFileReadPacketData</code>来说只要分配<code>近似帧大小 * 帧数</code>的内存空间即可，方法本身会针对给定的内存空间大小来决定最后输出多少个帧，如果空间不够会适当减少出的帧数；而对于<code>AudioFileReadPackets</code>来说则需要分配<code>最大帧大小(或帧大小上界) * 帧数</code>的内存空间才行（最大帧大小和帧大小上界的区别等下会说）；这也就是为何第三个参数一个是输入输出双向使用的，而另一个只是输出时使用的原因。就这点来说两个方法中前者在使用的过程中要比后者更省内存；</p>
-
-<p>返回值，同<code>AudioFileReadBytes</code>；</p>
-
-<p>这两个方法读取后的数据为帧分离后的数据，可以直接用来播放或者解码。</p>
-
-<p>下面给出两个方法的使用代码（以MP3为例）：</p>
-
-<p>```objc
-AudioFileID fileID; //Open方法返回的AudioFileID
-UInt32 ioNumPackets = &hellip;; //要读取多少个packet
-SInt64 inStartingPacket = &hellip;; //从第几个Packet开始读取</p>
-
-<p>UInt32 bitRate = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyBitRate
-UInt32 sampleRate = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyDataFormat或kAudioFilePropertyFormatList
-UInt32 byteCountPerPacket = 144 * bitRate / sampleRate; //MP3数据每个Packet的近似大小</p>
-
-<p>UInt32 descSize = sizeof(AudioStreamPacketDescription) * ioNumPackets;
-AudioStreamPacketDescription * outPacketDescriptions = (AudioStreamPacketDescription *)malloc(descSize);</p>
-
-<p>UInt32 ioNumBytes = byteCountPerPacket * ioNumPackets;
-void * outBuffer = (void *)malloc(ioNumBytes);</p>
-
-<p>OSStatus status = AudioFileReadPacketData(fileID,</p>
-
-<pre><code>                                        false, 
-                                        &amp;ioNumBytes, 
-                                        outPacketDescriptions, 
-                                        inStartingPacket, 
-                                        &amp;ioNumPackets, 
-                                        outBuffer);
-</code></pre>
-
-<p>```</p>
-
-<p>```objc
-AudioFileID fileID; //Open方法返回的AudioFileID
-UInt32 ioNumPackets = &hellip;; //要读取多少个packet
-SInt64 inStartingPacket = &hellip;; //从第几个Packet开始读取</p>
-
-<p>UInt32 maxByteCountPerPacket = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyMaximumPacketSize，最大的packet大小
-//也可以用：
-//UInt32 byteCountUpperBoundPerPacket = &hellip;; //AudioFileGetProperty读取kAudioFilePropertyPacketSizeUpperBound，当前packet大小上界（未扫描全文件的情况下）</p>
-
-<p>UInt32 descSize = sizeof(AudioStreamPacketDescription) * ioNumPackets;
-AudioStreamPacketDescription * outPacketDescriptions = (AudioStreamPacketDescription *)malloc(descSize);</p>
-
-<p>UInt32 outNumBytes = 0；
-UInt32 ioNumBytes = maxByteCountPerPacket * ioNumPackets;
-void * outBuffer = (void *)malloc(ioNumBytes);</p>
-
-<p>OSStatus status = AudioFileReadPackets(fileID,</p>
-
-<pre><code>                                   false,
-                                   &amp;outNumBytes,
-                                   outPacketDescriptions,
-                                   inStartingPacket,
-                                   &amp;ioNumPackets,
-                                   outBuffer);
-</code></pre>
-
-<p>```</p>
-
-<hr />
-
-<h1>Seek</h1>
-
-<p>seek的思路和之前讲<code>AudioFileStream</code>时讲到的是一样的，区别在于AudioFile没有方法来帮助修正seek的offset和seek的时间：</p>
-
-<ul>
-<li>使用<code>AudioFileReadBytes</code>时需要计算出approximateSeekOffset</li>
-<li>使用<code>AudioFileReadPacketData</code>或者<code>AudioFileReadPackets</code>时需要计算出seekToPacket</li>
-</ul>
-
-
-<p>approximateSeekOffset和seekToPacket的计算方法参见<a href="/blog/2014/07/09/audio-in-ios-3/">第三篇</a>。</p>
-
-<hr />
-
-<h1>关闭AudioFile</h1>
-
-<p><code>AudioFile</code>使用完毕后需要调用<code>AudioFileClose</code>进行关闭，没啥特别需要注意的。</p>
-
-<p><code>objc
-extern OSStatus AudioFileClose (AudioFileID inAudioFile);   
-</code></p>
-
-<hr />
-
-<h1>小结</h1>
-
-<p>本篇针对<code>AudioFile</code>的音频读取功能做了介绍，小结一下：</p>
-
-<ul>
-<li><p><code>AudioFile</code>有两个Open方法，需要针对自身的使用场景选择不同的方法；</p></li>
-<li><p><code>AudioFileOpenURL</code>用来读取本地文件</p></li>
-<li><p><code>AudioFileOpenWithCallbacks</code>的使用场景比前者要广泛，使用时需要注意<code>AudioFile_ReadProc</code>，这个回调方法在Open方法本身和Read方法被调用时会被<code>同步</code>调用</p></li>
-<li><p>必须保证音频文件格式信息可读时才能使用<code>AudioFile</code>的Open方法，AudioFile并不能独立用于音频流的读取，需要配合<code>AudioStreamFile</code>使用才能读取流（需要用<code>AudioStreamFile</code>来判断文件格式信息可读之后再调用Open方法）；</p></li>
-<li><p>使用<code>AudioFileGetProperty</code>读取格式信息时需要判断所读取的信息是否需要先调用<code>AudioFileGetPropertyInfo</code>获得数据大小后再进行读取；</p></li>
-<li><p>读取音频数据应该根据使用的场景选择不同的音频读取方法，对于不同的读取方法seek时需要计算的变量也不相同；</p></li>
-<li><p><code>AudioFile</code>使用完毕后需要调用<code>AudioFileClose</code>进行关闭；</p></li>
-</ul>
-
-
-<hr />
-
-<h1>示例代码</h1>
-
-<p><del>对于本地文件用AudioFile读取比较简单就不在这里提供demo了，</del></p>
-
-<p><a href="https://github.com/msching/MCAudioFile">简单的AudioFile封装</a>。</p>
-
-<p>对于流播放中的AudioFile使用推荐大家阅读豆瓣的开源播放器代码<a href="https://github.com/douban/DOUAudioStreamer">DOUAudioStreamer</a>。</p>
-
-<hr />
-
-<h1>下篇预告</h1>
-
-<p>下一篇将讲述如何使用<code>AudioQueue</code>。</p>
-
-<hr />
-
-<h1>参考资料</h1>
-
-<p><a href="https://developer.apple.com/library/mac/documentation/musicaudio/reference/AudioFileConvertRef/Reference/reference.html#//apple_ref/c/func/AudioFileCreateWithURL">Audio File Services Reference</a></p>
 ]]></content>
   </entry>
   
