@@ -4,7 +4,7 @@
   <title><![CDATA[码农人生]]></title>
   <link href="http://msching.github.io/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2016-06-02T18:37:28+08:00</updated>
+  <updated>2016-06-30T12:35:06+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -3693,7 +3693,7 @@
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'><span class="c1">//选择需要的格式</span>
-</span><span class='line'><span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">AudioFormatListItem</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">formatListSize</span><span class="p">;</span> <span class="n">i</span> <span class="o">+=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">AudioFormatListItem</span><span class="p">))</span>
+</span><span class='line'><span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">AudioFormatListItem</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">formatListSize</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
 </span><span class='line'><span class="p">{</span>
 </span><span class='line'>    <span class="n">AudioStreamBasicDescription</span> <span class="n">pasbd</span> <span class="o">=</span> <span class="n">formatList</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mASBD</span><span class="p">;</span>
 </span><span class='line'>    <span class="c1">//选择需要的格式。。                             </span>
