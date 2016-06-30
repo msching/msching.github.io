@@ -289,7 +289,7 @@ if (status != noErr)
 }
 
 //选择需要的格式
-for (int i = 0; i * sizeof(AudioFormatListItem) < formatListSize; i += sizeof(AudioFormatListItem))
+for (int i = 0; i * sizeof(AudioFormatListItem) < formatListSize; i++)
 {
     AudioStreamBasicDescription pasbd = formatList[i].mASBD;
     //选择需要的格式。。                             
