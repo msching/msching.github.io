@@ -353,8 +353,8 @@ double duration = (audioDataByteCount * 8) / bitRate
 
 ```objc
 typedef void (*AudioFileStream_PacketsProc)(void * inClientData,
-											  UInt32 inNumberBytes,
-											  UInt32 inNumberPackets,
+											  UInt32 numberOfBytes,
+											  UInt32 numberOfPackets,
 											  const void * inInputData,
 											  AudioStreamPacketDescription * inPacketDescriptions);
 ```
