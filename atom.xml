@@ -4,7 +4,7 @@
   <title><![CDATA[码农人生]]></title>
   <link href="http://msching.github.io/atom.xml" rel="self"/>
   <link href="http://msching.github.io/"/>
-  <updated>2016-06-30T12:35:06+08:00</updated>
+  <updated>2016-07-01T17:43:10+08:00</updated>
   <id>http://msching.github.io/</id>
   <author>
     <name><![CDATA[ChengYinZju]]></name>
@@ -3862,8 +3862,8 @@
 <span class='line-number'>50</span>
 <span class='line-number'>51</span>
 </pre></td><td class='code'><pre><code class='objc'><span class='line'><span class="k">static</span> <span class="kt">void</span> <span class="nf">MyAudioFileStreamPacketsCallBack</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">inClientData</span><span class="p">,</span>
-</span><span class='line'>                                             <span class="n">UInt32</span> <span class="n">inNumberBytes</span><span class="p">,</span>
-</span><span class='line'>                                             <span class="n">UInt32</span> <span class="n">inNumberPackets</span><span class="p">,</span>
+</span><span class='line'>                                             <span class="n">UInt32</span> <span class="n">numberOfBytes</span><span class="p">,</span>
+</span><span class='line'>                                             <span class="n">UInt32</span> <span class="n">numberOfPackets</span><span class="p">,</span>
 </span><span class='line'>                                             <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">inInputData</span><span class="p">,</span>
 </span><span class='line'>                                             <span class="n">AudioStreamPacketDescription</span>  <span class="o">*</span><span class="n">inPacketDescriptions</span><span class="p">)</span>
 </span><span class='line'><span class="p">{</span>
