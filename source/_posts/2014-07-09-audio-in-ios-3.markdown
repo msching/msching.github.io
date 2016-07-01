@@ -383,8 +383,8 @@ struct  AudioStreamPacketDescription
 
 ```
 static void MyAudioFileStreamPacketsCallBack(void *inClientData,
-                                             UInt32 inNumberBytes,
-                                             UInt32 inNumberPackets,
+                                             UInt32 numberOfBytes,
+                                             UInt32 numberOfPackets,
                                              const void *inInputData,
                                              AudioStreamPacketDescription	*inPacketDescriptions)
 {
