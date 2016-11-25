@@ -26,7 +26,7 @@ categories: [iOS,Audio,iOS Audio]
 
 > http://localhost:port?url=urlEncode(audioUrl)
 
-把组织好的URL交个播放器播放，播放器把请求发送到LocalServer上，LocalServer解析到实际的音频地址后发送请求或者读取已缓存的数据。
+把组织好的URL交给播放器播放，播放器把请求发送到LocalServer上，LocalServer解析到实际的音频地址后发送请求或者读取已缓存的数据。
 
 思路2.2 流播放器 + NSURLProtocol，大家都知道[NSURLProtocol](https://developer.apple.com/library/mac/documentation/Cocoa/Reference/Foundation/Classes/NSURLProtocol_Class/)可以拦截Cocoa平台下[URL Loading System](https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/URLLoadingSystem/URLLoadingSystem.html)中的请求，如果播放器的请求是运行在`URL Loading System`下的话使用这个方法可以轻松的拦截到播放器所发送的请求然后自己再进行请求或者读取缓存数据。这里需要注意如果使用AVPlayer作为播放器的话这种方法只在模拟器上才work，真机上并不能拦截到任何请求。这也证明AVPlayer在真机上并没有运行在`URL Loading System`下，但模拟器上却是（不知道在OSX下是否能work，有兴趣的同学可以尝试一下）。
 

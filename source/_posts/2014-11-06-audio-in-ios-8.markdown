@@ -16,7 +16,7 @@ categories: [iOS,Audio,iOS Audio]
 
 ----
 
-#NowPlayingCenter
+# NowPlayingCenter
 
 `NowPlayingCenter`能够显示当前正在播放的歌曲信息，它可以控制的范围包括：
 
@@ -126,7 +126,7 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 
 所以每次播放暂停和继续都需要更新`NowPlayingCenter`并正确设置`ElapsedPlaybackTime`和`PlaybackRate`否则`NowPlayingCenter`中的播放进度无法正常显示。
 
-###NowPlayingCenter的刷新时机
+### NowPlayingCenter的刷新时机
 
 频繁的刷新`NowPlayingCenter`并不可取，特别是在有Artwork的情况下。所以需要在合适的时候进行刷新。
 
@@ -139,13 +139,13 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 
 在刷新时可以适当的通过判断app是否active来决定是否必须刷新以减少刷新次数。
 
-###MPMediaItemPropertyArtwork
+### MPMediaItemPropertyArtwork
 
 这是一个非常有用的属性，我们可以利用歌曲的封面图来合成一些图片借此达到美化锁屏界面或者显示锁屏歌词。
 
 ----
 
-#RemoteControl
+# RemoteControl
 
 `RemoteComtrol`可以用来在不打开app的情况下控制app中的多媒体播放行为，涉及的内容主要包括：
 
@@ -155,8 +155,62 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 * AppleTV，AirPlay中显示的播放操作区域
 * 耳机线控
 * 车载系统的设置
+* ...
 
-###在何处处理RemoteComtrol
+### iOS 7.1之后如何处理RemoteControl
+
+iOS 7.1之后Apple提供了`MPRemoteCommandCenter`类来统一管理RemoteControl，并且在MPRemoteCommandCenter定义了比之前更多的RemoteControl操作，我们除了可以操作播放还可以进行一些其他的交互操作，比如收藏、评分等等。
+
+使用过程中我们只要为其中需要用到的command添加一个方法就可以实现RemoteControl。
+
+例如对于播放和暂停来说只要进行如下设置就可以了：
+
+```objc
+[[UIApplication sharedApplication] beginReceivingRemoteControlEvents]
+
+//返回值根据需要返回，一般情况下返回MPRemoteCommandHandlerStatusSuccess即可
+[[MPRemoteCommandCenter sharedCommandCenter].playCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
+    // play
+    return MPRemoteCommandHandlerStatusSuccess;
+}];
+    
+[[MPRemoteCommandCenter sharedCommandCenter].pauseCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
+    // pause
+    return MPRemoteCommandHandlerStatusSuccess;
+}];
+    
+[[MPRemoteCommandCenter sharedCommandCenter].togglePlayPauseCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
+    // play or pause
+    return MPRemoteCommandHandlerStatusSuccess;
+}];
+```
+或者
+
+```objc
+[[UIApplication sharedApplication] beginReceivingRemoteControlEvents]
+
+[[MPRemoteCommandCenter sharedCommandCenter].playCommand addTarget:self action:@selector(play)];
+[[MPRemoteCommandCenter sharedCommandCenter].pauseCommand addTarget:self action:@selector(pause)];
+[[MPRemoteCommandCenter sharedCommandCenter].togglePlayPauseCommand addTarget:self action:@selector(playOrPause)];
+```
+如果你只是临时使用的话记得在使用完成后removeTarget并调用endReceivingRemoteControlEvents，removeTarget的方法根据addTarget的方式不同而不同：
+
+1. 如果是`-addTargetWithHandler:`添加的，需要把返回的target记下来后调用`-removeTarget:`移除
+2. 如果是`-addTarget:action:`添加的，使用`-removeTarget:action:`移除
+
+对于播放控制之外的收藏、评分等操作需要注意command的相关属性，在必要的时候使用这些属性以达到需要的效果。例如`MPFeedbackCommand`的`active`属性。
+
+~~另外注意`MPChangePlaybackPositionCommand`是个坑，目前（iOS 9.x）看来还不能得到应用，无法通过公开的接口使用，必须调用私有接口后才能让锁屏界面和控制中心的进度条能够拖动，不知道iOS 10会不会开放。~~
+
+SDK8编译在iOS 10.1之后已经可以使用`MPChangePlaybackPositionCommand`了，而且不知道为什么iOS 8.4也是可以的，其他iOS版本依然不能应用。
+
+SDK8中还出现了两个新的Command，`MPChangeRepeatModeCommand`和`MPChangeShuffleModeCommand`，虽然SDK8中才出现却没有标记版本，说明是iOS7.1就开始有了？这个我不确信。这两个Command在锁屏界面和控制中心中没有UI对应，根据台湾[KKBOX公司的实践](https://medium.com/@zonble/the-issue-about-using-mpchangerepeatmodecommand-811840a39e93#.153icy7qb)，这两个Command是被用在CarPlay中，但使用之后出现了一些兼容性的问题，故不推荐大家使用。
+
+PS：macOS 10.12.1之后macOS也有RemoteControl和NowPlayingInfoCenter了，可以在2016款MBP的TouchBar上进行歌曲信息的展示和操作，其中RemoteControl可以接受耳机线控操作和键盘多媒体键操作（之前是要通过[SPMediaKeyTap](https://github.com/nevyn/SPMediaKeyTap)和[DDHidAppleMikey](https://github.com/Daij-Djan/DDHidLib/blob/master/lib/DDHidAppleMikey.m)实现的），耳机线控操作也不再唤起iTunes了，不过似乎只能在非沙箱环境下有效。
+
+### iOS 7.1之前如何处理RemoteComtrol
+
+#### 在何处处理RemoteComtrol
 根据[官方文档](https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html)的描述：
 
 `If your app plays audio or video content, you might want it to respond to remote control events that originate from either transport controls or external accessories. (External accessories must conform to Apple-provided specifications.) iOS converts commands into UIEvent objects and delivers the events to an app. The app sends them to the first responder and, if the first responder doesn’t handle them, they travel up the responder chain.`
@@ -167,7 +221,7 @@ MP_EXTERN NSString *const MPNowPlayingInfoPropertyChapterCount NS_AVAILABLE_IOS(
 
 ![](/images/iOS-audio/responder chain.jpg)
 
-###实现自己的UIApplication
+#### 实现自己的UIApplication
 
 首先新建一个`UIApplication`的子类
 
@@ -214,7 +268,7 @@ int main(int argc, char * argv[])
 
 这样就成功实现了自己的`UIApplication`.
 
-###处理RemoteComtrol
+#### 处理RemoteComtrol
 了解了应该在何处处理`RemoteComtrol`事件之后，再来看下[官方文档](https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html)中描述的三个必要条件：
 
 * 接受者必须能够成为first responder
@@ -272,27 +326,25 @@ int main(int argc, char * argv[])
 @end
 ```
 
-----
-
-#示例代码
-
-git上有一个关于remotecontrol的小工程供大家参考[ios-audio-remote-control](https://github.com/MosheBerman/ios-audio-remote-control)
+关于iOS 7之前的RemoteControl处理，git上有一个关于remotecontrol的小工程供大家参考[ios-audio-remote-control](https://github.com/MosheBerman/ios-audio-remote-control)
 
 <div class="github-card" data-github="MosheBerman/ios-audio-remote-control" data-width="400" data-height="" data-theme="default"></div>
 <script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
 
 ----
 
-#后记
+# 后记
 
 到本篇为止iOS的音频播放话题基本上算是完结了。接下来我会在空余时间去研究一下iOS 8中新加入的`AVAudioEngine`，其功能涵盖播放、录音、混音、音效处理，看上去十分强大，从接口的定义上看像是对`AudioUnit`的高层封装，当研究有了一定的成果之后也会以博文的形式分享出来。
 
 ----
 
-#参考资料
+# 参考资料
 
 [MPNowPlayingInfoCenter](https://encrypted.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&ved=0CC4QFjAA&url=https%3A%2F%2Fdeveloper.apple.com%2FLibrary%2Fios%2Fdocumentation%2FMediaPlayer%2FReference%2FMPNowPlayingInfoCenter_Class%2Findex.html&ei=8bBhVO_RF4HKmwXBiILIDA&usg=AFQjCNFOziF2zKft-wGQ3ew_cHy7Ivxrvg)
 
 [Remote Control Events](https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/Remote-ControlEvents/Remote-ControlEvents.html)
 
 [Cocoa Responder Chain](https://developer.apple.com/library/IOs/documentation/General/Conceptual/Devpedia-CocoaApp/Responder.html)
+
+[ios-audio-remote-control](https://github.com/MosheBerman/ios-audio-remote-control)
